@@ -5,303 +5,305 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
+import 'diagnose_screen.dart';
 
-// Spacing constants
-const double kDefaultPadding = 24.0;
-const double kSmallSpacing   = 16.0;
-const double kMediumSpacing  = 24.0;
-const double kButtonHeight   = 50.0;
-
-class LoginScreen extends StatefulWidget {
+/// Email + Password Authentication:
+///   • Register
+///   • Login
+///   • Request Password Reset
+class LoginScreen extends StatelessWidget {
   const LoginScreen({Key? key}) : super(key: key);
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 3, // Register / Login / Reset
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Email Authentication'),
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'Register'),
+              Tab(text: 'Login'),
+              Tab(text: 'Forgot Password'),
+            ],
+          ),
+        ),
+        body: const TabBarView(
+          children: [
+            _RegisterTab(),
+            _LoginTab(),
+            _ResetTab(),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _emailController    = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  bool _isLoading = false;
-  String? _errorMessage;
+// ─────────────────────────────────────────────────────────────────────────────
+// 1) REGISTER (EMAIL + PASSWORD) → POST /auth/register
+// ─────────────────────────────────────────────────────────────────────────────
+class _RegisterTab extends StatefulWidget {
+  const _RegisterTab({Key? key}) : super(key: key);
+  @override
+  State<_RegisterTab> createState() => _RegisterTabState();
+}
+
+class _RegisterTabState extends State<_RegisterTab> {
+  final _formKey = GlobalKey<FormState>();
+  final _firstNameCtrl = TextEditingController();
+  final _lastNameCtrl  = TextEditingController();
+  final _usernameCtrl  = TextEditingController();
+  final _emailCtrl     = TextEditingController();
+  final _passwordCtrl  = TextEditingController();
+  bool _loading = false;
+  String? _error;
+
+  Future<void> _register() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    final resp = await http.post(
+      Uri.parse('$backendBaseURL/auth/register'), // 📍 register
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'first_name': _firstNameCtrl.text.trim(),
+        'last_name' : _lastNameCtrl.text.trim(),
+        'username'  : _usernameCtrl.text.trim(),
+        'email'     : _emailCtrl.text.trim(),
+        'password'  : _passwordCtrl.text.trim(),
+      }),
+    );
+
+    if (resp.statusCode == 201) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✅ Registered! Check your email to verify.'))
+      );
+      // auto-advance to Login tab
+      DefaultTabController.of(context)!.animateTo(1);
+    } else {
+      setState(() {
+        _error = jsonDecode(resp.body)['error'] ?? resp.body;
+      });
+    }
+
+    setState(() => _loading = false);
+  }
+
+  @override
+  Widget build(BuildContext c) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          children: [
+            TextFormField(
+              controller: _firstNameCtrl,
+              decoration: const InputDecoration(labelText: 'First Name'),
+              validator: (v) => v!.isEmpty ? 'Required' : null,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _lastNameCtrl,
+              decoration: const InputDecoration(labelText: 'Last Name'),
+              validator: (v) => v!.isEmpty ? 'Required' : null,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _usernameCtrl,
+              decoration: const InputDecoration(labelText: 'Username'),
+              validator: (v) => v!.isEmpty ? 'Required' : null,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _emailCtrl,
+              decoration: const InputDecoration(labelText: 'Email'),
+              keyboardType: TextInputType.emailAddress,
+              validator: (v) => v!.contains('@') ? null : 'Valid email required',
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _passwordCtrl,
+              decoration: const InputDecoration(labelText: 'Password'),
+              obscureText: true,
+              validator: (v) => v!.length >= 8 ? null : 'Min 8 chars',
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _loading ? null : _register,
+              child: _loading
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : const Text('Register'),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 16),
+              Text(_error!, style: const TextStyle(color: Colors.red)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2) LOGIN (EMAIL + PASSWORD) → POST /auth/login
+// ─────────────────────────────────────────────────────────────────────────────
+class _LoginTab extends StatefulWidget {
+  const _LoginTab({Key? key}) : super(key: key);
+  @override
+  State<_LoginTab> createState() => _LoginTabState();
+}
+
+class _LoginTabState extends State<_LoginTab> {
+  final _emailCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  bool _loading = false;
+  String? _error;
 
   Future<void> _login() async {
     setState(() {
-      _isLoading    = true;
-      _errorMessage = null;
+      _loading = true;
+      _error = null;
     });
 
-    try {
-      final response = await http.post(
-        Uri.parse('\$backendBaseURL/auth/login'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email':    _emailController.text.trim(),
-          'password': _passwordController.text.trim(),
-        }),
-      );
+    final resp = await http.post(
+      Uri.parse('$backendBaseURL/auth/login'), // 📍 login
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'email': _emailCtrl.text.trim(),
+        'password': _passwordCtrl.text.trim(),
+      }),
+    );
 
-      if (response.statusCode == 200) {
-        final data  = jsonDecode(response.body);
-        final token = data['token'];
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('token', token);
-
-        if (context.mounted) {
-          Navigator.pushReplacementNamed(context, '/diagnose');
-        }
-      } else {
-        setState(() {
-          _errorMessage = 'Login failed. Check your credentials.';
-        });
+    if (resp.statusCode == 200) {
+      final jwt = jsonDecode(resp.body)['token'];
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('token', jwt);
+      if (context.mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const DiagnoseScreen()),
+        );
       }
-    } catch (e) {
+    } else {
       setState(() {
-        _errorMessage = 'Network error: \$e';
+        _error = jsonDecode(resp.body)['error'] ?? 'Login failed';
       });
-    } finally {
-      setState(() => _isLoading = false);
     }
+
+    setState(() => _loading = false);
   }
 
-  // 🔄 Added: Forgot password dialog
-  Future<void> _showForgotPasswordDialog() async {
-    final TextEditingController emailController = TextEditingController();
-    await showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Reset Password'),
-        content: TextField(
-          controller: emailController,
-          keyboardType: TextInputType.emailAddress,
-          decoration: const InputDecoration(
-            labelText: 'Enter your email',
+  @override
+  Widget build(BuildContext c) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          TextField(
+            controller: _emailCtrl,
+            decoration: const InputDecoration(labelText: 'Email'),
+            keyboardType: TextInputType.emailAddress,
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _passwordCtrl,
+            decoration: const InputDecoration(labelText: 'Password'),
+            obscureText: true,
           ),
-          TextButton(
-            onPressed: () async {
-              final email = emailController.text.trim();
-              if (email.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please enter your email.'))
-                );
-                return;
-              }
-              Navigator.pop(context);
-              try {
-                final resp = await http.post(
-                  Uri.parse('\$backendBaseURL/auth/request-reset'),
-                  headers: {'Content-Type': 'application/json'},
-                  body: jsonEncode({'email': email}),
-                );
-                if (resp.statusCode == 200) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Password reset email sent.'))
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed: \${resp.body}'))
-                  );
-                }
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Network error: \$e'))
-                );
-              }
-            },
-            child: const Text('Send'),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: _loading ? null : _login,
+            child: _loading
+                ? const CircularProgressIndicator(color: Colors.white)
+                : const Text('Login'),
           ),
+          if (_error != null) ...[
+            const SizedBox(height: 16),
+            Text(_error!, style: const TextStyle(color: Colors.red)),
+          ],
         ],
       ),
     );
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3) REQUEST PASSWORD RESET → POST /auth/request-reset
+// ─────────────────────────────────────────────────────────────────────────────
+class _ResetTab extends StatefulWidget {
+  const _ResetTab({Key? key}) : super(key: key);
+  @override
+  State<_ResetTab> createState() => _ResetTabState();
+}
+
+class _ResetTabState extends State<_ResetTab> {
+  final _emailCtrl = TextEditingController();
+  bool _loading = false;
+  String? _error;
+  String? _message;
+
+  Future<void> _requestReset() async {
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty) {
+      setState(() => _error = 'Enter your email');
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+      _message = null;
+    });
+
+    final resp = await http.post(
+      Uri.parse('$backendBaseURL/auth/request-reset'), // 📍 request-reset
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email}),
+    );
+
+    if (resp.statusCode == 200) {
+      setState(() => _message = '✅ Reset link sent. Check your email.');
+    } else {
+      setState(() {
+        _error = jsonDecode(resp.body)['error'] ?? 'Failed to send reset';
+      });
+    }
+
+    setState(() => _loading = false);
+  }
 
   @override
-  Widget build(BuildContext context) {
-    final theme        = Theme.of(context);
-    final primaryColor = theme.colorScheme.primary;
-    final onPrimary    = theme.colorScheme.onPrimary;
-
-    return Scaffold(
-      body: Stack(
+  Widget build(BuildContext c) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
         children: [
-          // 1) Full-screen sunrise background
-          Positioned.fill(
-            child: Image.asset(
-              'assets/bg_sunrise.png',
-              fit: BoxFit.cover,
-            ),
+          TextField(
+            controller: _emailCtrl,
+            decoration: const InputDecoration(labelText: 'Email'),
+            keyboardType: TextInputType.emailAddress,
           ),
-          // 2) Semi-transparent overlay
-          Positioned.fill(
-            child: Container(color: Colors.white.withOpacity(0.6)),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: _loading ? null : _requestReset,
+            child: _loading
+                ? const CircularProgressIndicator(color: Colors.white)
+                : const Text('Send Reset Email'),
           ),
-          // 3) Scrollable content
-          SingleChildScrollView(
-            padding: const EdgeInsets.all(kDefaultPadding),
-            child: Center(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SizedBox(height: kMediumSpacing),
-                  // Logo
-                  Center(
-                    child: Image.asset(
-                      'assets/logo.jpeg',
-                      height: 140,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                  const SizedBox(height: kMediumSpacing),
-
-                  // Form Card
-                  Card(
-                    color: Colors.white.withOpacity(0.85),
-                    elevation: 6,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(kDefaultPadding),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(
-                            'Welcome to CropHealthAI',
-                            style: theme.textTheme.headlineMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: kMediumSpacing),
-
-                          // Email
-                          TextField(
-                            controller: _emailController,
-                            keyboardType: TextInputType.emailAddress,
-                            decoration: const InputDecoration(
-                              prefixIcon: Icon(Icons.email),
-                              hintText: 'Email',
-                            ),
-                          ),
-                          const SizedBox(height: kSmallSpacing),
-
-                          // Password
-                          TextField(
-                            controller: _passwordController,
-                            obscureText: true,
-                            decoration: const InputDecoration(
-                              prefixIcon: Icon(Icons.lock),
-                              hintText: 'Password',
-                            ),
-                          ),
-                          const SizedBox(height: kSmallSpacing),
-
-                          // Error message
-                          if (_errorMessage != null) ...[
-                            Text(
-                              _errorMessage!,
-                              style: TextStyle(color: theme.colorScheme.error),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: kSmallSpacing),
-                          ],
-
-                          // Login Button
-                          ElevatedButton(
-                            onPressed: _login,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: primaryColor,
-                              foregroundColor: onPrimary,
-                              minimumSize: const Size.fromHeight(kButtonHeight),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: _isLoading
-                                ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                                : const Text('Login', style: TextStyle(fontWeight: FontWeight.bold)),
-                          ),
-                          const SizedBox(height: kSmallSpacing),
-
-                          // 🔄 Forgot password link
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton(
-                              onPressed: _showForgotPasswordDialog,
-                              child: const Text('Forgot Password?'),
-                            ),
-                          ),
-
-                          // Register link
-                          TextButton(
-                            onPressed: () => Navigator.pushReplacementNamed(context, '/register'),
-                            child: const Text(
-                              "Don't have an account? Register",
-                              style: TextStyle(
-                                color: Colors.black87,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: kSmallSpacing),
-                          const Divider(),
-                          const SizedBox(height: kSmallSpacing),
-
-                          // OR Separator
-                          Center(
-                            child: Text(
-                              'OR',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: kSmallSpacing),
-
-                          // Phone Login Button
-                          OutlinedButton.icon(
-                            onPressed: () => Navigator.pushNamed(context, '/phone'),
-                            icon: Icon(Icons.phone_android, color: primaryColor),
-                            label: Text(
-                              'Login with Phone',
-                              style: TextStyle(
-                                color: primaryColor,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              side: BorderSide(color: primaryColor, width: 2),
-                              minimumSize: const Size.fromHeight(kButtonHeight),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: kMediumSpacing),
-                ],
-              ),
-            ),
-          ),
+          if (_message != null) ...[
+            const SizedBox(height: 16),
+            Text(_message!, style: const TextStyle(color: Colors.green)),
+          ],
+          if (_error != null) ...[
+            const SizedBox(height: 16),
+            Text(_error!, style: const TextStyle(color: Colors.red)),
+          ],
         ],
       ),
     );
