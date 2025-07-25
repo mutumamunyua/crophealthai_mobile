@@ -1,21 +1,169 @@
 // lib/screens/landing_screen.dart
 
+import 'dart:async';                                    // for Timer
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';            // ✅ ADDED: geolocator for location
+import '../services/weather_service.dart';              // ✅ ADDED: our weather/alerts service
 import 'login_screen.dart';
-import 'phone_registration_screen.dart';
+import 'phone_input_screen.dart';
 
-// ─── CONSTANTS ───────────────────────────────────────────────────────────
-const double kDefaultPadding    = 24.0;
-const double kSmallSpacing      = 8.0;
-const double kMediumSpacing     = 16.0;
-const double kLogoSize          = 230.0;
-const double kButtonHeight      = 50.0;
-const double kStepContainerSize = 56.0;  // circle diameter
-const double kStepIconSize      = 32.0;  // icon inside circle
-const double kStepSpacing       = 10.0;  // gap between items
+// ─── SPACING & SIZE CONSTANTS ───────────────────────────────────────────
+const double kDefaultPadding     = 24.0;
+const double kSmallSpacing       = 8.0;
+const double kMediumSpacing      = 16.0;
+const double kLogoSize           = 230.0;
+const double kButtonHeight       = 50.0;
+const double kStepContainerSize  = 56.0;
+const double kStepIconSize       = 32.0;
+const double kStepSpacing        = 10.0;
 
-class LandingScreen extends StatelessWidget {
+class LandingScreen extends StatefulWidget {
   const LandingScreen({Key? key}) : super(key: key);
+
+  @override
+  State<LandingScreen> createState() => _LandingScreenState();
+}
+
+class _LandingScreenState extends State<LandingScreen> {
+  final WeatherService _weatherService = WeatherService(); // ✅ ADDED
+
+  double? temperature;
+  double? windspeed;
+  int?    rain;
+  int?    humidity;
+  List<String>? alerts;
+
+  int _bannerIndex = 0;
+  Timer? _bannerTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkPermissionThenLoad();                        // 🔄 UPDATED: request permission before loading
+  }
+
+  @override
+  void dispose() {
+    _bannerTimer?.cancel();
+    super.dispose();
+  }
+
+  // ✅ NEW: check/request location permission, then call _initData()
+  Future<void> _checkPermissionThenLoad() async {
+    var status = await Geolocator.checkPermission();
+    if (status == LocationPermission.denied) {
+      status = await Geolocator.requestPermission();
+    }
+    if (status == LocationPermission.deniedForever) {
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('Location Required'),
+            content: const Text(
+                'Enable location in settings to see weather and alerts.'
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Geolocator.openAppSettings();
+                  Navigator.pop(context);
+                },
+                child: const Text('Open Settings'),
+              ),
+            ],
+          ),
+        );
+      }
+      return;
+    }
+    if (status == LocationPermission.always ||
+        status == LocationPermission.whileInUse) {
+      _initData();                                     // 🔄 UPDATED: only call _initData after permission
+    }
+  }
+
+  // 🔄 UPDATED: simply return position (permission already handled)
+  Future<Position?> _getCurrentLocation() async {
+    return Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+  }
+
+  // existing: fetch weather & alerts
+  Future<void> _initData() async {
+    final pos = await _getCurrentLocation();
+    if (pos == null) return;
+
+    final weatherFuture = _weatherService.fetchWeather(pos.latitude, pos.longitude);
+    final alertsFuture  = _weatherService.fetchAlerts(pos.latitude, pos.longitude);
+    final results       = await Future.wait([weatherFuture, alertsFuture]);
+
+    final wd = results[0] as WeatherData?;
+    final al = results[1] as List<String>?;
+
+    setState(() {
+      temperature = wd?.temperature;
+      windspeed   = wd?.windspeed;
+      rain        = wd?.rain;
+      humidity    = wd?.humidity;
+      alerts      = al;
+    });
+
+    if (alerts == null || alerts!.isEmpty) {
+      _bannerTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+        setState(() {
+          _bannerIndex = (_bannerIndex + 1) % 4;
+        });
+      });
+    }
+  }
+
+  // existing: build rotating or alert banner
+  Widget _buildBanner() {
+    if (alerts != null && alerts!.isNotEmpty) {
+      return Card(
+        color: Colors.red[50],
+        margin: const EdgeInsets.symmetric(horizontal: kDefaultPadding),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            children: alerts!
+                .map((a) => Text(a, style: const TextStyle(fontWeight: FontWeight.bold)))
+                .toList(),
+          ),
+        ),
+      );
+    }
+
+    final slides = [
+      '☀️ Temp: ${temperature?.toStringAsFixed(1) ?? '--'}°C',
+      '💨 Wind: ${windspeed?.toStringAsFixed(1) ?? '--'} km/h',
+      '🌧 Rain: ${rain ?? 0} mm',
+      '💧 Humidity: ${humidity ?? 0}%',
+    ];
+    const summary = '✅ Enjoy good growing conditions!';
+
+    return Card(
+      color: Colors.blue[50],
+      margin: const EdgeInsets.symmetric(horizontal: kDefaultPadding),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            Text(
+              slides[_bannerIndex],
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 4),
+            const Text(summary, style: TextStyle(fontStyle: FontStyle.italic)),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,168 +174,146 @@ class LandingScreen extends StatelessWidget {
     return Scaffold(
       body: Stack(
         children: [
-          // ─── Full-screen sunrise background ─────────────────────────
+          // original background
           Positioned.fill(
-            child: Image.asset(
-              'assets/bg_sunrise.png',
-              fit: BoxFit.cover,
-            ),
+            child: Image.asset('assets/bg_sunrise.png', fit: BoxFit.cover),
+          ),
+          Positioned.fill(
+            child: Container(color: Colors.black.withOpacity(0.3)),
           ),
 
-          Column(
-            children: [
-              // ─── Top: logo, title, taglines, steps ───────────────────
-              Expanded(
-                flex: 2,
-                child: Padding(
-                  padding: const EdgeInsets.all(kDefaultPadding),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Logo
-                      SizedBox(
-                        width: kLogoSize,
-                        height: kLogoSize,
-                        child: Image.asset('assets/logo.jpeg', fit: BoxFit.contain),
-                      ),
+          SafeArea(
+            child: Column(
+              children: [
+                // 🔄 UPDATED: weather strip appears after permission/grab
+                if (temperature != null && windspeed != null)
+                  Container(
+                    width: double.infinity,
+                    color: Colors.black54,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      '${temperature!.toStringAsFixed(1)}°C · Wind: ${windspeed!.toStringAsFixed(1)} km/h',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                    ),
+                  ),
 
-                      const SizedBox(height: kMediumSpacing),
-
-                      // English Title
-                      Text(
-                        'Welcome to CropHealthAI',
-                        style: theme.textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                // existing: logo, taglines, steps
+                Expanded(
+                  flex: 2,
+                  child: Padding(
+                    padding: const EdgeInsets.all(kDefaultPadding),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: kLogoSize,
+                          height: kLogoSize,
+                          child: Image.asset('assets/logo.jpeg', fit: BoxFit.contain),
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-
-                      const SizedBox(height: kSmallSpacing),
-
-                      // Taglines
-                      Text(
-                        'AI-powered crop diagnosis in your pocket',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                        const SizedBox(height: kMediumSpacing),
+                        Text(
+                          'Welcome to CropHealthAI',
+                          style: theme.textTheme.headlineMedium
+                              ?.copyWith(fontWeight: FontWeight.bold, color: Colors.white),
+                          textAlign: TextAlign.center,
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: kSmallSpacing),
-                      Text(
-                        'Kilimo Bora kutumia technologia ya AI',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          fontStyle: FontStyle.italic,
-                          color: Colors.black87,
+                        const SizedBox(height: kSmallSpacing),
+                        Text(
+                          'AI-powered crop diagnosis in your pocket',
+                          style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                          textAlign: TextAlign.center,
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-
-                      const SizedBox(height: kMediumSpacing * 1.5),
-
-                      // Four-step sequence with arrows
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _StepItem(
-                            icon: Icons.camera_alt,
-                            label: 'Take\npicture',
-                            color: primaryColor,
-                          ),
-                          const SizedBox(width: kStepSpacing),
-                          const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.black54),
-                          const SizedBox(width: kStepSpacing),
-                          _StepItem(
-                            icon: Icons.analytics,
-                            label: 'See\ndiag.',
-                            color: primaryColor,
-                          ),
-                          const SizedBox(width: kStepSpacing),
-                          const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.black54),
-                          const SizedBox(width: kStepSpacing),
-                          _StepItem(
-                            icon: Icons.science,
-                            label: 'Get\ntreatment',
-                            color: primaryColor,
-                          ),
-                          const SizedBox(width: kStepSpacing),
-                          const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.black54),
-                          const SizedBox(width: kStepSpacing),
-                          _StepItem(
-                            icon: Icons.motorcycle,
-                            label: 'Get\ndelivery',
-                            color: primaryColor,
-                          ),
-                        ],
-                      ),
-                    ],
+                        const SizedBox(height: kSmallSpacing),
+                        Text(
+                          'Kilimo Bora kutumia technologia ya AI',
+                          style: theme.textTheme.bodyMedium
+                              ?.copyWith(fontStyle: FontStyle.italic, color: Colors.white70),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: kMediumSpacing * 1.5),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _StepItem(icon: Icons.camera_alt, label: 'Take\npicture', color: primaryColor),
+                            const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white70),
+                            _StepItem(icon: Icons.analytics, label: 'See\ndiag.', color: primaryColor),
+                            const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white70),
+                            _StepItem(icon: Icons.science, label: 'Get\ntreatment', color: primaryColor),
+                            const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white70),
+                            _StepItem(icon: Icons.motorcycle, label: 'Get\ndelivery', color: primaryColor),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
 
-              // ─── Bottom: login buttons ────────────────────────────────
-              Expanded(
-                flex: 1,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: kDefaultPadding,
-                    vertical: kMediumSpacing,
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Email login/signup
-                      SizedBox(
-                        width: double.infinity,
-                        height: kButtonHeight,
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.email),
-                          label: const Text('Login / Sign Up via Email'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryColor,
-                            foregroundColor: onPrimary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                // existing: rotating/flashing banner
+                Padding(
+                  padding: const EdgeInsets.only(bottom: kMediumSpacing),
+                  child: _buildBanner(),
+                ),
+
+                // existing: login buttons
+                Expanded(
+                  flex: 1,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: kDefaultPadding, vertical: kMediumSpacing),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: double.infinity,
+                          height: kButtonHeight,
+                          child: ElevatedButton.icon(
+                            icon: const Icon(Icons.email),
+                            label: const Text('Login / Sign Up via Email'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryColor,
+                              foregroundColor: onPrimary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const LoginScreen()),
                             ),
                           ),
-                          onPressed: () => Navigator.pushNamed(context, '/login'),
                         ),
-                      ),
-
-                      const SizedBox(height: kMediumSpacing),
-
-                      // Phone login/signup
-                      SizedBox(
-                        width: double.infinity,
-                        height: kButtonHeight,
-                        child: OutlinedButton.icon(
-                          icon: Icon(Icons.phone_android, color: primaryColor),
-                          label: Text(
-                            'Login / Sign Up via Phone',
-                            style: TextStyle(
-                              color: primaryColor,
-                              fontWeight: FontWeight.bold,
+                        const SizedBox(height: kMediumSpacing),
+                        SizedBox(
+                          width: double.infinity,
+                          height: kButtonHeight,
+                          child: OutlinedButton.icon(
+                            icon: Icon(Icons.phone_android, color: primaryColor),
+                            label: Text(
+                              'Login / Sign Up via Phone',
+                              style: TextStyle(
+                                  color: primaryColor, fontWeight: FontWeight.bold),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              side: BorderSide(color: primaryColor, width: 2),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const PhoneInputScreen()),
                             ),
                           ),
-                          style: OutlinedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            side: BorderSide(color: primaryColor, width: 2),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          onPressed: () => Navigator.pushNamed(context, '/phone'),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -195,17 +321,11 @@ class LandingScreen extends StatelessWidget {
   }
 }
 
-/// A single step item: icon inside a circle + label below
 class _StepItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
-
-  const _StepItem({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
+  const _StepItem({required this.icon, required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -216,9 +336,9 @@ class _StepItem extends StatelessWidget {
           height: kStepContainerSize,
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(kStepContainerSize / 2),
+            shape: BoxShape.circle,
             boxShadow: const [
-              BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2)),
+              BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))
             ],
           ),
           child: Icon(icon, size: kStepIconSize, color: color),
@@ -226,12 +346,8 @@ class _StepItem extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
           textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 12, color: Colors.white),
         ),
       ],
     );
