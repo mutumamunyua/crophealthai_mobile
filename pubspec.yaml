@@ -1,30 +1,39 @@
 name: crophealthai_mobile
-description: AI-powered crop diagnosis in your pocket
-publish_to: "none"
+description: AI-powered crop diagnosis in your pocket.
+publish_to: "none" # this is not a pub package
+
+version: 1.0.0+1
 
 environment:
-  sdk: ">=2.18.0 <3.0.0"
+  sdk: ">=3.7.0 <4.0.0"
+  flutter: ">=3.27.0"
 
 dependencies:
   flutter:
     sdk: flutter
 
-  url_launcher: ^6.1.7
-
-  # Core
-  cupertino_icons: ^1.0.2
-  http: ^0.13.6
-  shared_preferences: ^2.5.3
+  # Icons
+  cupertino_icons: ^1.0.8
 
   # Firebase
   firebase_core: ^2.32.0
   firebase_auth: ^4.20.0
 
-  # Device / Location
+  # Location & geolocation
   geolocator: ^10.1.1
-  image_picker: ^0.8.5+3
 
-  # Country code + flags
+  url_launcher: ^6.1.7
+
+  # HTTP requests
+  http: ^0.13.6
+
+  # Persistent storage
+  shared_preferences: ^2.5.3
+
+  # Image picker
+  image_picker: ^0.8.9
+
+  # International phone field
   intl_phone_field: ^3.2.0
 
 dev_dependencies:
@@ -38,3 +47,4 @@ flutter:
   assets:
     - assets/bg_sunrise.png
     - assets/logo.jpeg
+    - assets/phone_verification.jpeg
