@@ -1,196 +1,151 @@
 // lib/screens/treatment_screen.dart
 
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:geolocator/geolocator.dart';
-import '../config.dart';
+import 'package:url_launcher/url_launcher.dart'; // for dialing phone numbers
 
-// ─── SPACING CONSTANTS ─────────────────────────────────────────────────
-const double kDefaultPadding = 24.0;
-const double kSmallSpacing   = 12.0;
-const double kMediumSpacing  = 24.0;
-const double kButtonHeight   = 50.0;
-
-class TreatmentScreen extends StatefulWidget {
+/// A screen that shows the disease name, treatment steps (with images),
+/// and nearby agrovets & extension workers.
+class TreatmentScreen extends StatelessWidget {
   final String disease;
+  final String treatmentText;
+  final List<String>? imageUrls;
+  final List<Map<String, dynamic>>? agrovets;
+  final List<Map<String, dynamic>>? extensionWorkers;
 
   const TreatmentScreen({
     Key? key,
     required this.disease,
+    required this.treatmentText,
+    this.imageUrls,
+    this.agrovets,
+    this.extensionWorkers,
   }) : super(key: key);
 
-  @override
-  State<TreatmentScreen> createState() => _TreatmentScreenState();
-}
-
-class _TreatmentScreenState extends State<TreatmentScreen> {
-  bool _isLoading = true;
-  String? _error;
-
-  // ✅ NEW: Data coming from the Flask `/utils/treatments/...` response
-  String? _treatmentText;
-  List<String>? _treatmentImages;
-  List<dynamic>? _agrovets;
-  List<dynamic>? _extensionWorkers;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchTreatment();
-  }
-
-  Future<void> _fetchTreatment() async {
-    setState(() {
-      _isLoading = true;
-      _error     = null;
-    });
-
-    Position? pos;
-    try {
-      pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-    } catch (_) {
-      pos = null; // no location
-    }
-
-    final query = <String, String>{};
-    if (pos != null) {
-      query['latitude']  = pos.latitude.toString();
-      query['longitude'] = pos.longitude.toString();
-    }
-
-    final uri = Uri.parse(
-      '$backendBaseURL/utils/treatments/${Uri.encodeComponent(widget.disease)}',
-    ).replace(queryParameters: query);
-
-    try {
-      final res = await http.get(uri);
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-
-        setState(() {
-          _treatmentText     = data['treatment'] as String;
-          _treatmentImages   = List<String>.from(data['treatment_images'] ?? []);
-          _agrovets          = List<dynamic>.from(data['agrovets'] ?? []);
-          _extensionWorkers  = List<dynamic>.from(data['extension_workers'] ?? []);
-          _isLoading         = false;
-        });
-      } else {
-        setState(() {
-          _error     = 'Error ${res.statusCode}: ${res.body}';
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _error     = 'Failed to load treatment: $e';
-        _isLoading = false;
-      });
+  void _launchPhone(String number) async {
+    final uri = Uri(scheme: 'tel', path: number);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
     }
   }
 
-  Widget _buildListSection<T>(
-      String title,
-      List<T>? items,
-      Widget Function(T) itemBuilder,
-      ) {
-    if (items == null || items.isEmpty) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: kSmallSpacing),
-        ...items.map(itemBuilder).toList(),
-        const SizedBox(height: kMediumSpacing),
-      ],
+  Widget _buildSectionTitle(BuildContext context, String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12.0),
+      child: Text(
+        title,
+        style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  Widget _buildImageCarousel() {
+    if (imageUrls == null || imageUrls!.isEmpty) {
+      return const Text('No treatment images available.');
+    }
+    return SizedBox(
+      height: 200,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: imageUrls!.length,
+        itemBuilder: (ctx, i) => Padding(
+          padding: const EdgeInsets.only(right: 8.0),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.network(
+              imageUrls![i],
+              width: 200,
+              height: 200,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                color: Colors.grey[200],
+                width: 200,
+                height: 200,
+                child: const Icon(Icons.broken_image, size: 48),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContactCard(Map<String, dynamic> item, {bool isAgrovet = true}) {
+    final name = isAgrovet
+        ? item['name'] ?? 'Unknown Agrovet'
+        : '${item['first_name'] ?? ''} ${item['last_name'] ?? ''}'.trim();
+    final location = '${item['town'] ?? 'N/A'}, ${item['county'] ?? 'N/A'}';
+    final contact = item['contact'] ?? 'N/A';
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      child: ListTile(
+        title: Text(name),
+        subtitle: Text(location),
+        trailing: IconButton(
+          icon: const Icon(Icons.phone),
+          onPressed: () {
+            if (contact != 'N/A') _launchPhone(contact);
+          },
+        ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
       appBar: AppBar(
-        title: Text('Treatment for ${widget.disease}'),
+        title: Text('Treatment for $disease'),
+        centerTitle: true,
       ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(kDefaultPadding),
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _error != null
-              ? Center(child: Text(_error!, style: theme.textTheme.bodyLarge?.copyWith(color: Colors.red)))
-              : SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // ─── Treatment Text ──────────────────────
-                Text(
-                  'Recommendation',
-                  style: theme.textTheme.headlineMedium,
-                ),
-                const SizedBox(height: kSmallSpacing),
-                Text(
-                  _treatmentText ?? 'No treatment info available.',
-                  style: theme.textTheme.bodyMedium,
-                ),
-                const SizedBox(height: kMediumSpacing),
-
-                // ─── Treatment Images ────────────────────
-                if (_treatmentImages != null && _treatmentImages!.isNotEmpty) ...[
-                  Text('Images', style: theme.textTheme.headlineSmall),
-                  const SizedBox(height: kSmallSpacing),
-                  SizedBox(
-                    height: 120,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _treatmentImages!.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: kSmallSpacing),
-                      itemBuilder: (context, i) => ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          _treatmentImages![i],
-                          width: 120,
-                          height: 120,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: kMediumSpacing),
-                ],
-
-                // ─── Nearby Agrovets ────────────────────
-                _buildListSection<Map<String, dynamic>>(
-                  'Nearby Agrovets',
-                  _agrovets,
-                      (agro) => Card(
-                    child: ListTile(
-                      title: Text(agro['name'] ?? 'Unknown'),
-                      subtitle: Text('${agro['town']}, ${agro['county']}'),
-                      trailing: Icon(Icons.store_mall_directory),
-                    ),
-                  ),
-                ),
-
-                // ─── Nearby Extension Workers ───────────
-                _buildListSection<Map<String, dynamic>>(
-                  'Nearby Extension Workers',
-                  _extensionWorkers,
-                      (w) => Card(
-                    child: ListTile(
-                      title: Text('${w['first_name']} ${w['last_name']}'),
-                      subtitle: Text('${w['town']}, ${w['county']}'),
-                      trailing: Icon(Icons.engineering),
-                    ),
-                  ),
-                ),
-              ],
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Treatment text
+            _buildSectionTitle(context, 'Recommended Treatment'),
+            Text(
+              treatmentText,
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
-          ),
+
+            // Images
+            const SizedBox(height: 16),
+            _buildSectionTitle(context, 'Treatment Images'),
+            _buildImageCarousel(),
+
+            // Nearby Agrovet stores
+            const SizedBox(height: 16),
+            if (agrovets != null && agrovets!.isNotEmpty) ...[
+              _buildSectionTitle(context, 'Nearby Agrovet Stores'),
+              ...agrovets!
+                  .map((a) => _buildContactCard(a, isAgrovet: true))
+                  .toList(),
+            ],
+
+            // Extension workers
+            const SizedBox(height: 16),
+            if (extensionWorkers != null && extensionWorkers!.isNotEmpty) ...[
+              _buildSectionTitle(context, 'Nearby Extension Workers'),
+              ...extensionWorkers!
+                  .map((w) => _buildContactCard(w, isAgrovet: false))
+                  .toList(),
+            ],
+
+            // Fallback if neither list has items
+            if ((agrovets == null || agrovets!.isEmpty) &&
+                (extensionWorkers == null || extensionWorkers!.isEmpty))
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: Text(
+                    'No nearby services found.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
