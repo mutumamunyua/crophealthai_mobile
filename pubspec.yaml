@@ -22,7 +22,7 @@ dependencies:
   # Location & geolocation
   geolocator: ^10.1.1
 
-  url_launcher: ^6.1.7
+  url_launcher: ^6.3.2
 
   # HTTP requests
   http: ^0.13.6
@@ -35,6 +35,8 @@ dependencies:
 
   # International phone field
   intl_phone_field: ^3.2.0
+
+  pin_code_fields: ^8.0.1
 
 dev_dependencies:
   flutter_test:

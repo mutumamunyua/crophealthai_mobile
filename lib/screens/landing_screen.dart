@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';            // ✅ ADDED: geolocator for location
 import '../services/weather_service.dart';              // ✅ ADDED: our weather/alerts service
 import 'login_screen.dart';
-import 'phone_input_screen.dart';
+import 'phone_registration_screen.dart';
 
 // ─── SPACING & SIZE CONSTANTS ───────────────────────────────────────────
 const double kDefaultPadding     = 24.0;
@@ -15,7 +15,6 @@ const double kLogoSize           = 230.0;
 const double kButtonHeight       = 50.0;
 const double kStepContainerSize  = 56.0;
 const double kStepIconSize       = 32.0;
-const double kStepSpacing        = 10.0;
 
 class LandingScreen extends StatefulWidget {
   const LandingScreen({Key? key}) : super(key: key);
@@ -61,7 +60,7 @@ class _LandingScreenState extends State<LandingScreen> {
           builder: (_) => AlertDialog(
             title: const Text('Location Required'),
             content: const Text(
-                'Enable location in settings to see weather and alerts.'
+              'Enable location in settings to see weather and alerts.',
             ),
             actions: [
               TextButton(
@@ -89,7 +88,9 @@ class _LandingScreenState extends State<LandingScreen> {
 
   // 🔄 UPDATED: simply return position (permission already handled)
   Future<Position?> _getCurrentLocation() async {
-    return Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    return Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
   }
 
   // existing: fetch weather & alerts
@@ -174,7 +175,7 @@ class _LandingScreenState extends State<LandingScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // original background
+          // ─── background layers ───────────────────────────────
           Positioned.fill(
             child: Image.asset('assets/bg_sunrise.png', fit: BoxFit.cover),
           ),
@@ -182,10 +183,11 @@ class _LandingScreenState extends State<LandingScreen> {
             child: Container(color: Colors.black.withOpacity(0.3)),
           ),
 
+          // ─── foreground content ───────────────────────────────
           SafeArea(
             child: Column(
               children: [
-                // 🔄 UPDATED: weather strip appears after permission/grab
+                // 🔄 weather strip
                 if (temperature != null && windspeed != null)
                   Container(
                     width: double.infinity,
@@ -198,14 +200,16 @@ class _LandingScreenState extends State<LandingScreen> {
                     ),
                   ),
 
-                // existing: logo, taglines, steps
+                // make everything else scrollable
                 Expanded(
-                  flex: 2,
-                  child: Padding(
-                    padding: const EdgeInsets.all(kDefaultPadding),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: kDefaultPadding,
+                      vertical: kMediumSpacing,
+                    ),
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
+                        // ─── logo & taglines ───────────────────────
                         SizedBox(
                           width: kLogoSize,
                           height: kLogoSize,
@@ -232,38 +236,45 @@ class _LandingScreenState extends State<LandingScreen> {
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: kMediumSpacing * 1.5),
+
+                        // ─── step icons ────────────────────────────
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            _StepItem(icon: Icons.camera_alt, label: 'Take\npicture', color: primaryColor),
+                            _StepItem(
+                              icon: Icons.camera_alt,
+                              label: 'Take\npicture',
+                              color: primaryColor,
+                            ),
                             const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white70),
-                            _StepItem(icon: Icons.analytics, label: 'See\ndiag.', color: primaryColor),
+                            _StepItem(
+                              icon: Icons.analytics,
+                              label: 'See\ndiag.',
+                              color: primaryColor,
+                            ),
                             const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white70),
-                            _StepItem(icon: Icons.science, label: 'Get\ntreatment', color: primaryColor),
+                            _StepItem(
+                              icon: Icons.science,
+                              label: 'Get\ntreatment',
+                              color: primaryColor,
+                            ),
                             const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white70),
-                            _StepItem(icon: Icons.motorcycle, label: 'Get\ndelivery', color: primaryColor),
+                            _StepItem(
+                              icon: Icons.motorcycle,
+                              label: 'Get\ndelivery',
+                              color: primaryColor,
+                            ),
                           ],
                         ),
-                      ],
-                    ),
-                  ),
-                ),
 
-                // existing: rotating/flashing banner
-                Padding(
-                  padding: const EdgeInsets.only(bottom: kMediumSpacing),
-                  child: _buildBanner(),
-                ),
+                        const SizedBox(height: kMediumSpacing),
 
-                // existing: login buttons
-                Expanded(
-                  flex: 1,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: kDefaultPadding, vertical: kMediumSpacing),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
+                        // ─── rotating/flashing banner ──────────────
+                        _buildBanner(),
+
+                        const SizedBox(height: kMediumSpacing),
+
+                        // ─── login buttons ─────────────────────────
                         SizedBox(
                           width: double.infinity,
                           height: kButtonHeight,
@@ -292,7 +303,9 @@ class _LandingScreenState extends State<LandingScreen> {
                             label: Text(
                               'Login / Sign Up via Phone',
                               style: TextStyle(
-                                  color: primaryColor, fontWeight: FontWeight.bold),
+                                color: primaryColor,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                             style: OutlinedButton.styleFrom(
                               backgroundColor: Colors.white,
@@ -303,8 +316,7 @@ class _LandingScreenState extends State<LandingScreen> {
                             ),
                             onPressed: () => Navigator.push(
                               context,
-                              MaterialPageRoute(
-                                  builder: (_) => const PhoneInputScreen()),
+                              MaterialPageRoute(builder: (_) => const PhoneRegistrationScreen()),
                             ),
                           ),
                         ),
@@ -319,13 +331,19 @@ class _LandingScreenState extends State<LandingScreen> {
       ),
     );
   }
-}
+} // end of _LandingScreenState
 
 class _StepItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
-  const _StepItem({required this.icon, required this.label, required this.color});
+
+  const _StepItem({
+    required this.icon,
+    required this.label,
+    required this.color,
+    Key? key,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -338,7 +356,7 @@ class _StepItem extends StatelessWidget {
             color: Colors.white,
             shape: BoxShape.circle,
             boxShadow: const [
-              BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))
+              BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2)),
             ],
           ),
           child: Icon(icon, size: kStepIconSize, color: color),

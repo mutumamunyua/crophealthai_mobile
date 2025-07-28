@@ -7,7 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../config.dart';
+import '../config.dart';  // defines `backendBaseURL`
 
 class TreatmentScreen extends StatefulWidget {
   final String disease;
@@ -37,30 +37,34 @@ class _TreatmentScreenState extends State<TreatmentScreen> {
 
   Future<void> _loadTreatment() async {
     try {
-      // 1) Ask for location
+      // 1) Request location permission
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
-      if (permission == LocationPermission.deniedForever ||
-          permission == LocationPermission.denied) {
-        throw ('Location permission is required');
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        throw 'Location permission is required';
       }
-      final pos = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high);
 
-      // 2) Hit your Flask endpoint
-      final encodedDisease =
-      Uri.encodeComponent(widget.disease.trim());
+      // 2) Get current position
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      // 3) Fetch from backend
+      final encodedDisease = Uri.encodeComponent(widget.disease.trim());
       final uri = Uri.parse(
-          '${Config.BASE_URL}/utils/treatments/$encodedDisease?latitude=${pos.latitude}&longitude=${pos.longitude}');
+        '$backendBaseURL/utils/treatments/$encodedDisease'
+            '?latitude=${pos.latitude}&longitude=${pos.longitude}',
+      );
       final resp = await http.get(uri);
 
       if (resp.statusCode != 200) {
-        throw ('Server error (${resp.statusCode})');
+        throw 'Server error (${resp.statusCode})';
       }
 
-      final data = json.decode(resp.body);
+      final data = json.decode(resp.body) as Map<String, dynamic>;
       setState(() {
         _treatmentText = data['treatment'] as String?;
         _imageUrls = (data['treatment_images'] as List?)
@@ -68,9 +72,8 @@ class _TreatmentScreenState extends State<TreatmentScreen> {
             .toList();
         _agrovets = (data['agrovets'] as List?)
             ?.cast<Map<String, dynamic>>();
-        _extensionWorkers =
-            (data['extension_workers'] as List?)
-                ?.cast<Map<String, dynamic>>();
+        _extensionWorkers = (data['extension_workers'] as List?)
+            ?.cast<Map<String, dynamic>>();
         _isLoading = false;
       });
     } catch (e) {
@@ -108,6 +111,7 @@ class _TreatmentScreenState extends State<TreatmentScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Images carousel
             if (_imageUrls != null && _imageUrls!.isNotEmpty) ...[
               SizedBox(
                 height: 200,
@@ -128,7 +132,7 @@ class _TreatmentScreenState extends State<TreatmentScreen> {
               const SizedBox(height: 16),
             ],
 
-            // Treatment text
+            // Treatment recommendation
             if (_treatmentText != null) ...[
               Text(
                 'Recommendation',
@@ -142,7 +146,7 @@ class _TreatmentScreenState extends State<TreatmentScreen> {
               const SizedBox(height: 24),
             ],
 
-            // Agrovets
+            // Nearby agrovets
             if (_agrovets != null && _agrovets!.isNotEmpty) ...[
               Text(
                 'Nearby Agrovets',

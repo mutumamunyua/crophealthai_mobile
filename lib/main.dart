@@ -8,11 +8,15 @@ import 'screens/landing_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/phone_registration_screen.dart';
 import 'screens/diagnose_screen.dart';
+import 'screens/treatment_screen.dart';
 import 'screens/chat_screen.dart';
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const CropHealthAIApp());
 }
 
@@ -30,21 +34,19 @@ class CropHealthAIApp extends StatelessWidget {
       ),
       initialRoute: '/',
       routes: {
-        // Landing & auth
+        // Landing & Authentication
         '/':        (_) => const LandingScreen(),
         '/login':   (_) => const LoginScreen(),
-        '/register':(_) => const LoginScreen(),              // email signup on same screen
-        '/phone':   (_) => const PhoneRegistrationScreen(),   // unified phone reg/login
+        '/register':(_) => const LoginScreen(),  // Email signup on same screen
+        '/phone':   (_) => const PhoneRegistrationScreen(),
 
-        // Core flow
+        // Core Flow
         '/diagnose':(_) => const DiagnoseScreen(),
         '/chat':    (_) => const ChatScreen(),
-      },
 
-      // Note: TreatmentScreen requires args, so we push it directly in DiagnoseScreen:
-      // Navigator.push(context,
-      //   MaterialPageRoute(builder: (_) => TreatmentScreen(...)));
-      // No need to register a named '/treatment' route here.
+        // Note: TreatmentScreen requires dynamic arguments, so it's
+        // pushed directly via MaterialPageRoute from DiagnoseScreen.
+      },
     );
   }
 }

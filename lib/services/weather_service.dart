@@ -2,7 +2,9 @@
 
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../config.dart';
 
+/// Holds the basic weather metrics
 class WeatherData {
   final double temperature;
   final double windspeed;
@@ -27,32 +29,29 @@ class WeatherData {
 }
 
 class WeatherService {
-  final String _baseUrl = 'https://YOUR_DEPLOYED_BACKEND_URL'; // ← point to your Flask `/alerts` route
-
+  /// Fetch tomorrow’s weather summary
   Future<WeatherData?> fetchWeather(double lat, double lon) async {
+    final uri = Uri.parse('$backendBaseURL/alerts');
     final resp = await http.post(
-      Uri.parse('$_baseUrl/alerts'),
+      uri,
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'latitude': lat, 'longitude': lon}),
+      body: json.encode({'latitude': lat, 'longitude': lon}),
     );
-    if (resp.statusCode == 200) {
-      final data = jsonDecode(resp.body);
-      return WeatherData.fromJson(data);
-    }
-    return null;
+    if (resp.statusCode != 200) return null;
+    final jsonBody = json.decode(resp.body) as Map<String, dynamic>;
+    return WeatherData.fromJson(jsonBody);
   }
 
+  /// Fetch actionable alerts (or empty list)
   Future<List<String>?> fetchAlerts(double lat, double lon) async {
+    final uri = Uri.parse('$backendBaseURL/alerts');
     final resp = await http.post(
-      Uri.parse('$_baseUrl/alerts'),
+      uri,
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'latitude': lat, 'longitude': lon}),
+      body: json.encode({'latitude': lat, 'longitude': lon}),
     );
-    if (resp.statusCode == 200) {
-      final data = jsonDecode(resp.body);
-      final List<dynamic> alerts = data['alerts'] as List<dynamic>;
-      return alerts.map((a) => a.toString()).toList();
-    }
-    return null;
+    if (resp.statusCode != 200) return null;
+    final jsonBody = json.decode(resp.body) as Map<String, dynamic>;
+    return List<String>.from(jsonBody['alerts'] ?? []);
   }
 }

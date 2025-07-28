@@ -16,3 +16,22 @@ macos/Pods/
 macos/Runner/Flutter-*.xcconfig
 macos/Podfile
 macos/Podfile.lock
+
+# macOS Finder metadata
+.DS_Store
+
+# Flutter “plugin registrant” files (auto-generated)
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Firebase config files (keep these out of source control; each dev will generate their own)
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+macos/Runner/GoogleService-Info.plist
+lib/firebase_options.dart
+firebase.json
+
+# (Optional) if you have an assets/ dir generated locally and not meant for repo
+# assets/
+
+# End of additions
