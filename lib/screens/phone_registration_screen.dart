@@ -1,70 +1,327 @@
-// lib/screens/phone_registration_screen.dart
-
 import 'dart:convert';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // CORRECTED THIS LINE
 import 'package:http/http.dart' as http;
 
-import '../config.dart';             // for backendBaseURL
-import 'diagnose_screen.dart';       // navigate on success
+import '../config.dart';          // for backendBaseURL
+import 'diagnose_screen.dart';    // navigate on success
 
+//==============================================================================
+// MAIN AUTHENTICATION SCREEN (ENTRY POINT)
+//==============================================================================
+
+/// The main entry widget for the phone authentication flow.
+/// It directs the user to the LoginPage.
 class PhoneRegistrationScreen extends StatelessWidget {
   const PhoneRegistrationScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 3,  // Register, Login, Forgot PIN
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Phone Authentication'),
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'Register'),
-              Tab(text: 'Login'),
-              Tab(text: 'Forgot PIN'),
-            ],
+    // The default screen is now the LoginPage.
+    // Register and Reset PIN are separate pages navigated to from here.
+    return const LoginPage();
+  }
+}
+
+//==============================================================================
+// 1. LOGIN PAGE
+//==============================================================================
+
+/// Displays the login form with a modern UI and provides navigation
+/// to Register and Reset PIN pages.
+class LoginPage extends StatefulWidget {
+  const LoginPage({Key? key}) : super(key: key);
+
+  @override
+  State<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
+  String? _rawPhone;
+  final _pinCtrl = TextEditingController();
+  bool _loading = false;
+  String? _error;
+
+  /// Handles the login logic by calling the backend.
+  Future<void> _loginWithPin() async {
+    final pin = _pinCtrl.text.trim();
+    if (_rawPhone == null || pin.length != 4) {
+      setState(() => _error = 'Phone & 4-digit PIN required');
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final resp = await http.post(
+        Uri.parse('$backendBaseURL/auth/phone/login-pin'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'phone': _rawPhone, 'pin': pin}),
+      );
+
+      if (resp.statusCode == 200) {
+        final jwt = jsonDecode(resp.body)['token'] as String;
+        await SharedPreferences.getInstance().then((p) => p.setString('token', jwt));
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const DiagnoseScreen()),
+        );
+      } else {
+        final body = jsonDecode(resp.body);
+        setState(() => _error = body['error'] ?? 'Login failed');
+      }
+    } catch (e) {
+      setState(() => _error = 'Error: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        // A beautiful gradient background for a modern look.
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.green.shade400, Colors.green.shade600],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
         ),
-        body: const TabBarView(
-          children: [
-            _RegisterTab(),
-            _LoginTab(),
-            _ResetPinTab(),
-          ],
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Header section with improved typography
+                  const Text(
+                    'Welcome Back',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 36,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      shadows: [
+                        Shadow(blurRadius: 10.0, color: Colors.black26, offset: Offset(0, 2)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Sign in to continue',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.white.withOpacity(0.9),
+                    ),
+                  ),
+                  const SizedBox(height: 50),
+
+                  // The main form card with a glassmorphism effect
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white.withOpacity(0.2)),
+                    ),
+                    child: Column(
+                      children: [
+                        // Phone Field with updated styling
+                        IntlPhoneField(
+                          style: const TextStyle(color: Colors.white),
+                          decoration: _buildInputDecoration('Phone Number'),
+                          dropdownTextStyle: const TextStyle(color: Colors.white),
+                          dropdownIcon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+                          initialCountryCode: 'KE',
+                          keyboardType: TextInputType.phone,
+                          onChanged: (p) {
+                            var local = p.number;
+                            if (local.startsWith('0')) local = local.substring(1);
+                            _rawPhone = '${p.countryCode}$local';
+                          },
+                        ),
+                        const SizedBox(height: 16),
+
+                        // PIN Field with updated styling
+                        TextField(
+                          controller: _pinCtrl,
+                          obscureText: true,
+                          style: const TextStyle(color: Colors.white),
+                          keyboardType: TextInputType.number,
+                          maxLength: 4,
+                          decoration: _buildInputDecoration('Enter PIN'),
+                        ),
+                        const SizedBox(height: 30),
+
+                        // Login Button with enhanced styling
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: Colors.green,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 5,
+                            ),
+                            onPressed: _loading ? null : _loginWithPin,
+                            child: _loading
+                                ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.deepPurple))
+                                : const Text('LOGIN', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Error Message
+                  if (_error != null)
+                    Text(
+                      _error!,
+                      style: const TextStyle(color: Colors.amberAccent, fontSize: 14, fontWeight: FontWeight.w500),
+                      textAlign: TextAlign.center,
+                    ),
+                  const SizedBox(height: 20),
+
+                  // Navigation Links
+                  _buildNavigationLinks(context),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
   }
+
+  /// Helper to build consistent InputDecoration for text fields.
+  InputDecoration _buildInputDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: TextStyle(color: Colors.white.withOpacity(0.8)),
+      counterText: '',
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.white.withOpacity(0.5)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.white, width: 2),
+      ),
+    );
+  }
+
+  /// Builds the clickable text links for navigating to other pages.
+  Widget _buildNavigationLinks(BuildContext context) {
+    return Column(
+      children: [
+        Text.rich(
+          TextSpan(
+            text: "Not registered? ",
+            style: TextStyle(color: Colors.white.withOpacity(0.8)),
+            children: [
+              TextSpan(
+                text: 'Register/Sign Up',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  decoration: TextDecoration.underline,
+                ),
+                recognizer: TapGestureRecognizer()
+                  ..onTap = () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const RegisterPage()),
+                    );
+                  },
+              ),
+            ],
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 12),
+        Text.rich(
+          TextSpan(
+            text: "Forgot PIN? ",
+            style: TextStyle(color: Colors.white.withOpacity(0.8)),
+            children: [
+              TextSpan(
+                text: 'Reset here',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  decoration: TextDecoration.underline,
+                ),
+                recognizer: TapGestureRecognizer()
+                  ..onTap = () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ResetPinPage()),
+                    );
+                  },
+              ),
+            ],
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
 }
 
-// ─── 1) REGISTER ────────────────────────────────────────────────────────────
-// Phone → PIN + confirm → Send OTP → Enter OTP → POST /auth/phone/register
-class _RegisterTab extends StatefulWidget {
-  const _RegisterTab({Key? key}) : super(key: key);
+//==============================================================================
+// 2. REGISTRATION PAGE
+//==============================================================================
+
+/// A separate page for new user registration with a clean UI.
+class RegisterPage extends StatefulWidget {
+  const RegisterPage({Key? key}) : super(key: key);
   @override
-  State<_RegisterTab> createState() => _RegisterTabState();
+  State<RegisterPage> createState() => _RegisterPageState();
 }
 
-class _RegisterTabState extends State<_RegisterTab> {
+class _RegisterPageState extends State<RegisterPage> {
   String? _rawPhone;
   String? _verificationId;
-  final _pinCtrl        = TextEditingController();
+  final _pinCtrl = TextEditingController();
   final _confirmPinCtrl = TextEditingController();
-  final _otpCtrl        = TextEditingController();
-  bool   _otpSent  = false, _loading = false;
+  final _otpCtrl = TextEditingController();
+  bool _otpSent = false, _loading = false;
   String? _error;
 
+  /// Sends an OTP to the user's phone for verification.
   Future<void> _sendOtp() async {
-    final pin  = _pinCtrl.text.trim();
+    final pin = _pinCtrl.text.trim();
     final conf = _confirmPinCtrl.text.trim();
     if (_rawPhone == null || pin.length != 4 || pin != conf) {
       setState(() => _error = 'Phone & matching 4-digit PINs required');
       return;
     }
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     await FirebaseAuth.instance.verifyPhoneNumber(
       phoneNumber: _rawPhone!,
       timeout: const Duration(seconds: 60),
@@ -78,9 +335,14 @@ class _RegisterTabState extends State<_RegisterTab> {
       verificationFailed: (e) => setState(() => _error = e.message),
       codeAutoRetrievalTimeout: (_) {},
     );
-    setState(() { _loading = false; });
+    if (mounted) {
+      setState(() {
+        _loading = false;
+      });
+    }
   }
 
+  /// Verifies the OTP and registers the user on the backend.
   Future<void> _verifyAndRegister() async {
     final otp = _otpCtrl.text.trim();
     final pin = _pinCtrl.text.trim();
@@ -88,7 +350,10 @@ class _RegisterTabState extends State<_RegisterTab> {
       setState(() => _error = 'Enter a 6-digit OTP');
       return;
     }
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final cred = PhoneAuthProvider.credential(
         verificationId: _verificationId!,
@@ -118,210 +383,156 @@ class _RegisterTabState extends State<_RegisterTab> {
     } catch (e) {
       setState(() => _error = 'Error: $e');
     } finally {
-      setState(() { _loading = false; });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          if (!_otpSent) ...[
-            IntlPhoneField(
-              decoration: const InputDecoration(
-                labelText: 'Phone Number',
-                border: UnderlineInputBorder(),
-              ),
-              initialCountryCode: 'KE',
-              onChanged: (p) => _rawPhone = p.completeNumber,
-              keyboardType: TextInputType.phone,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _pinCtrl,
-              obscureText: true,
-              keyboardType: TextInputType.number,
-              maxLength: 4,
-              decoration: const InputDecoration(
-                labelText: 'Set PIN (4 digits)',
-                border: UnderlineInputBorder(),
-                counterText: '',
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _confirmPinCtrl,
-              obscureText: true,
-              keyboardType: TextInputType.number,
-              maxLength: 4,
-              decoration: const InputDecoration(
-                labelText: 'Confirm PIN',
-                border: UnderlineInputBorder(),
-                counterText: '',
-              ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _loading ? null : _sendOtp,
-              child: _loading
-                  ? const SizedBox(width: 16, height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Send OTP'),
-            ),
-          ] else ...[
-            TextField(
-              controller: _otpCtrl,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              decoration: const InputDecoration(
-                labelText: 'Enter OTP',
-                border: UnderlineInputBorder(),
-                counterText: '',
-              ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _loading ? null : _verifyAndRegister,
-              child: _loading
-                  ? const SizedBox(width: 16, height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Verify & Register'),
-            ),
-          ],
-          if (_error != null) ...[
-            const SizedBox(height: 16),
-            Text(_error!, style: const TextStyle(color: Colors.red)),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-// ─── 2) LOGIN ────────────────────────────────────────────────────────────────
-// Phone → PIN only → POST /auth/phone/login-pin
-class _LoginTab extends StatefulWidget {
-  const _LoginTab({Key? key}) : super(key: key);
-  @override
-  State<_LoginTab> createState() => _LoginTabState();
-}
-
-class _LoginTabState extends State<_LoginTab> {
-  String? _rawPhone;
-  final _pinCtrl = TextEditingController();
-  bool   _loading = false;
-  String? _error;
-
-  Future<void> _loginWithPin() async {
-    final pin = _pinCtrl.text.trim();
-    if (_rawPhone == null || pin.length != 4) {
-      setState(() => _error = 'Phone & 4-digit PIN required');
-      return;
-    }
-    setState(() { _loading = true; _error = null; });
-
-    try {
-      final resp = await http.post(
-        Uri.parse('$backendBaseURL/auth/phone/login-pin'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'phone': _rawPhone, 'pin': pin}),
-      );
-
-      if (resp.statusCode == 200) {
-        final jwt = jsonDecode(resp.body)['token'] as String;
-        await SharedPreferences.getInstance().then((p) => p.setString('token', jwt));
-        if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const DiagnoseScreen()),
-        );
-      } else {
-        final body = jsonDecode(resp.body);
-        setState(() => _error = body['error'] ?? 'Login failed');
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
       }
-    } catch (e) {
-      setState(() => _error = 'Error: $e');
-    } finally {
-      setState(() { _loading = false; });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          IntlPhoneField(
-            decoration: const InputDecoration(
-              labelText: 'Phone Number',
-              border: UnderlineInputBorder(),
-            ),
-            initialCountryCode: 'KE',
-            keyboardType: TextInputType.phone,
-            onChanged: (p) {
-              // strip any leading zero from the local number, then re-prefix:
-              var local = p.number;
-              if (local.startsWith('0')) local = local.substring(1);
-              _rawPhone = '${p.countryCode}$local';
-            },
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_otpSent ? 'Verify Phone' : 'Create Account'),
+        backgroundColor: Colors.green.shade400,
+        elevation: 0,
+      ),
+      body: Container(
+        color: Colors.grey[100],
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (!_otpSent) ...[
+                IntlPhoneField(
+                  decoration: const InputDecoration(
+                    labelText: 'Phone Number',
+                    border: OutlineInputBorder(),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  initialCountryCode: 'KE',
+                  onChanged: (p) => _rawPhone = p.completeNumber,
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _pinCtrl,
+                  obscureText: true,
+                  keyboardType: TextInputType.number,
+                  maxLength: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Set PIN (4 digits)',
+                    border: OutlineInputBorder(),
+                    filled: true,
+                    fillColor: Colors.white,
+                    counterText: '',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _confirmPinCtrl,
+                  obscureText: true,
+                  keyboardType: TextInputType.number,
+                  maxLength: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Confirm PIN',
+                    border: OutlineInputBorder(),
+                    filled: true,
+                    fillColor: Colors.white,
+                    counterText: '',
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: Colors.green.shade400,
+                  ),
+                  onPressed: _loading ? null : _sendOtp,
+                  child: _loading
+                      ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('SEND OTP'),
+                ),
+              ] else ...[
+                Text("Enter the 6-digit code sent to $_rawPhone",
+                    textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: _otpCtrl,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  decoration: const InputDecoration(
+                    labelText: 'Enter OTP',
+                    border: OutlineInputBorder(),
+                    filled: true,
+                    fillColor: Colors.white,
+                    counterText: '',
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: Colors.green.shade400,
+                  ),
+                  onPressed: _loading ? null : _verifyAndRegister,
+                  child: _loading
+                      ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('VERIFY & REGISTER'),
+                ),
+              ],
+              if (_error != null) ...[
+                const SizedBox(height: 16),
+                Text(_error!, style: const TextStyle(color: Colors.red), textAlign: TextAlign.center),
+              ],
+            ],
           ),
-          const SizedBox(height: 16),
-
-          TextField(
-            controller: _pinCtrl,
-            obscureText: true,
-            keyboardType: TextInputType.number,
-            maxLength: 4,
-            decoration: const InputDecoration(
-              labelText: 'Enter PIN',
-              border: UnderlineInputBorder(),
-              counterText: '',
-            ),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: _loading ? null : _loginWithPin,
-            child: _loading
-                ? const SizedBox(width: 16, height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('Login with PIN'),
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: 16),
-            Text(_error!, style: const TextStyle(color: Colors.red)),
-          ],
-        ],
+        ),
       ),
     );
   }
 }
 
-// ─── 3) FORGOT PIN ───────────────────────────────────────────────────────────
-// Phone → Send OTP → OTP + new PIN + confirm → POST /auth/phone/reset-pin
-class _ResetPinTab extends StatefulWidget {
-  const _ResetPinTab({Key? key}) : super(key: key);
+//==============================================================================
+// 3. RESET PIN PAGE
+//==============================================================================
+
+/// A separate page for resetting a forgotten PIN with a clean UI.
+class ResetPinPage extends StatefulWidget {
+  const ResetPinPage({Key? key}) : super(key: key);
   @override
-  State<_ResetPinTab> createState() => _ResetPinTabState();
+  State<ResetPinPage> createState() => _ResetPinPageState();
 }
 
-class _ResetPinTabState extends State<_ResetPinTab> {
+class _ResetPinPageState extends State<ResetPinPage> {
   String? _rawPhone;
   String? _verificationId;
-  final _otpCtrl        = TextEditingController();
-  final _newPinCtrl     = TextEditingController();
+  final _otpCtrl = TextEditingController();
+  final _newPinCtrl = TextEditingController();
   final _confirmPinCtrl = TextEditingController();
-  bool   _otpSent  = false, _loading = false;
+  bool _otpSent = false, _loading = false;
   String? _error;
 
+  /// Sends an OTP to the user's phone.
   Future<void> _sendOtp() async {
     if (_rawPhone == null) {
       setState(() => _error = 'Enter phone first');
       return;
     }
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
 
     await FirebaseAuth.instance.verifyPhoneNumber(
       phoneNumber: _rawPhone!,
@@ -337,19 +548,27 @@ class _ResetPinTabState extends State<_ResetPinTab> {
       codeAutoRetrievalTimeout: (_) {},
     );
 
-    setState(() { _loading = false; });
+    if (mounted) {
+      setState(() {
+        _loading = false;
+      });
+    }
   }
 
+  /// Verifies the OTP and resets the PIN on the backend.
   Future<void> _verifyAndReset() async {
-    final otp    = _otpCtrl.text.trim();
+    final otp = _otpCtrl.text.trim();
     final newPin = _newPinCtrl.text.trim();
-    final conf   = _confirmPinCtrl.text.trim();
+    final conf = _confirmPinCtrl.text.trim();
 
     if (otp.length != 6 || newPin.length != 4 || newPin != conf) {
       setState(() => _error = 'OTP + matching 4-digit PINs required');
       return;
     }
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final cred = PhoneAuthProvider.credential(
         verificationId: _verificationId!,
@@ -365,19 +584,15 @@ class _ResetPinTabState extends State<_ResetPinTab> {
       );
 
       if (resp.statusCode == 200) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('✅ PIN updated! Please login with new PIN'),
+            content: Text('✅ PIN updated! Please login with new PIN'),
+            backgroundColor: Colors.green,
           ),
         );
-        // switch back to Login tab
-        DefaultTabController.of(context)?.animateTo(1);
-        setState(() {
-          _otpSent = false;
-          _otpCtrl.clear();
-          _newPinCtrl.clear();
-          _confirmPinCtrl.clear();
-        });
+        // Pop back to the Login Page
+        Navigator.of(context).pop();
       } else {
         final body = jsonDecode(resp.body);
         setState(() => _error = body['error'] ?? 'Reset failed');
@@ -385,89 +600,124 @@ class _ResetPinTabState extends State<_ResetPinTab> {
     } catch (e) {
       setState(() => _error = 'Error: $e');
     } finally {
-      setState(() { _loading = false; });
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext c) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          if (!_otpSent) ...[
-            IntlPhoneField(
-              decoration: const InputDecoration(
-                labelText: 'Phone Number',
-                border: UnderlineInputBorder(),
-              ),
-              initialCountryCode: 'KE',
-              keyboardType: TextInputType.phone,
-              onChanged: (p) {
-                // strip any leading zero from the local number, then re-prefix:
-                var local = p.number;
-                if (local.startsWith('0')) local = local.substring(1);
-                _rawPhone = '${p.countryCode}$local';
-              },
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _loading ? null : _sendOtp,
-              child: _loading
-                  ? const SizedBox(width: 16, height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Send OTP'),
-            ),
-          ] else ...[
-            TextField(
-              controller: _otpCtrl,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              decoration: const InputDecoration(
-                labelText: 'Enter OTP',
-                border: UnderlineInputBorder(),
-                counterText: '',
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _newPinCtrl,
-              obscureText: true,
-              keyboardType: TextInputType.number,
-              maxLength: 4,
-              decoration: const InputDecoration(
-                labelText: 'New PIN',
-                border: UnderlineInputBorder(),
-                counterText: '',
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _confirmPinCtrl,
-              obscureText: true,
-              keyboardType: TextInputType.number,
-              maxLength: 4,
-              decoration: const InputDecoration(
-                labelText: 'Confirm PIN',
-                border: UnderlineInputBorder(),
-                counterText: '',
-              ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _loading ? null : _verifyAndReset,
-              child: _loading
-                  ? const SizedBox(width: 16, height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Reset PIN'),
-            ),
-          ],
-          if (_error != null) ...[
-            const SizedBox(height: 16),
-            Text(_error!, style: const TextStyle(color: Colors.red)),
-          ],
-        ],
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_otpSent ? 'Verify & Reset' : 'Reset PIN'),
+        backgroundColor: Colors.green.shade600,
+        elevation: 0,
+      ),
+      body: Container(
+        color: Colors.grey[100],
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (!_otpSent) ...[
+                IntlPhoneField(
+                  decoration: const InputDecoration(
+                    labelText: 'Phone Number',
+                    border: OutlineInputBorder(),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  initialCountryCode: 'KE',
+                  keyboardType: TextInputType.phone,
+                  onChanged: (p) {
+                    var local = p.number;
+                    if (local.startsWith('0')) local = local.substring(1);
+                    _rawPhone = '${p.countryCode}$local';
+                  },
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: Colors.green.shade600,
+                  ),
+                  onPressed: _loading ? null : _sendOtp,
+                  child: _loading
+                      ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('SEND OTP'),
+                ),
+              ] else ...[
+                TextField(
+                  controller: _otpCtrl,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  decoration: const InputDecoration(
+                    labelText: 'Enter OTP',
+                    border: OutlineInputBorder(),
+                    filled: true,
+                    fillColor: Colors.white,
+                    counterText: '',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _newPinCtrl,
+                  obscureText: true,
+                  keyboardType: TextInputType.number,
+                  maxLength: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'New PIN',
+                    border: OutlineInputBorder(),
+                    filled: true,
+                    fillColor: Colors.white,
+                    counterText: '',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _confirmPinCtrl,
+                  obscureText: true,
+                  keyboardType: TextInputType.number,
+                  maxLength: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Confirm PIN',
+                    border: OutlineInputBorder(),
+                    filled: true,
+                    fillColor: Colors.white,
+                    counterText: '',
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: Colors.green.shade600,
+                  ),
+                  onPressed: _loading ? null : _verifyAndReset,
+                  child: _loading
+                      ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('RESET PIN'),
+                ),
+              ],
+              if (_error != null) ...[
+                const SizedBox(height: 16),
+                Text(_error!, style: const TextStyle(color: Colors.red), textAlign: TextAlign.center),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
 }
+

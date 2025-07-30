@@ -28,8 +28,8 @@ class _LandingScreenState extends State<LandingScreen> {
 
   double? temperature;
   double? windspeed;
-  int?    rain;
-  int?    humidity;
+  int? rain;
+  int? humidity;
   List<String>? alerts;
 
   int _bannerIndex = 0;
@@ -38,7 +38,7 @@ class _LandingScreenState extends State<LandingScreen> {
   @override
   void initState() {
     super.initState();
-    _checkPermissionThenLoad();                        // 🔄 UPDATED: request permission before loading
+    _checkPermissionThenLoad(); // 🔄 UPDATED: request permission before loading
   }
 
   @override
@@ -57,32 +57,33 @@ class _LandingScreenState extends State<LandingScreen> {
       if (context.mounted) {
         showDialog(
           context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('Location Required'),
-            content: const Text(
-              'Enable location in settings to see weather and alerts.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
+          builder: (_) =>
+              AlertDialog(
+                title: const Text('Location Required'),
+                content: const Text(
+                  'Enable location in settings to see weather and alerts.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Geolocator.openAppSettings();
+                      Navigator.pop(context);
+                    },
+                    child: const Text('Open Settings'),
+                  ),
+                ],
               ),
-              TextButton(
-                onPressed: () {
-                  Geolocator.openAppSettings();
-                  Navigator.pop(context);
-                },
-                child: const Text('Open Settings'),
-              ),
-            ],
-          ),
         );
       }
       return;
     }
     if (status == LocationPermission.always ||
         status == LocationPermission.whileInUse) {
-      _initData();                                     // 🔄 UPDATED: only call _initData after permission
+      _initData(); // 🔄 UPDATED: only call _initData after permission
     }
   }
 
@@ -98,19 +99,21 @@ class _LandingScreenState extends State<LandingScreen> {
     final pos = await _getCurrentLocation();
     if (pos == null) return;
 
-    final weatherFuture = _weatherService.fetchWeather(pos.latitude, pos.longitude);
-    final alertsFuture  = _weatherService.fetchAlerts(pos.latitude, pos.longitude);
-    final results       = await Future.wait([weatherFuture, alertsFuture]);
+    final weatherFuture = _weatherService.fetchWeather(
+        pos.latitude, pos.longitude);
+    final alertsFuture = _weatherService.fetchAlerts(
+        pos.latitude, pos.longitude);
+    final results = await Future.wait([weatherFuture, alertsFuture]);
 
     final wd = results[0] as WeatherData?;
     final al = results[1] as List<String>?;
 
     setState(() {
       temperature = wd?.temperature;
-      windspeed   = wd?.windspeed;
-      rain        = wd?.rain;
-      humidity    = wd?.humidity;
-      alerts      = al;
+      windspeed = wd?.windspeed;
+      rain = wd?.rain;
+      humidity = wd?.humidity;
+      alerts = al;
     });
 
     if (alerts == null || alerts!.isEmpty) {
@@ -132,7 +135,8 @@ class _LandingScreenState extends State<LandingScreen> {
           padding: const EdgeInsets.all(12),
           child: Column(
             children: alerts!
-                .map((a) => Text(a, style: const TextStyle(fontWeight: FontWeight.bold)))
+                .map((a) =>
+                Text(a, style: const TextStyle(fontWeight: FontWeight.bold)))
                 .toList(),
           ),
         ),
@@ -168,16 +172,16 @@ class _LandingScreenState extends State<LandingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme        = Theme.of(context);
+    final theme = Theme.of(context);
     final primaryColor = theme.colorScheme.primary;
-    final onPrimary    = theme.colorScheme.onPrimary;
+    final onPrimary = theme.colorScheme.onPrimary;
 
     return Scaffold(
       body: Stack(
         children: [
           // ─── background layers ───────────────────────────────
           Positioned.fill(
-            child: Image.asset('assets/bg_sunrise.png', fit: BoxFit.cover),
+            child: Image.asset('assets/bg_sunrise.jpeg', fit: BoxFit.cover),
           ),
           Positioned.fill(
             child: Container(color: Colors.black.withOpacity(0.3)),
@@ -188,7 +192,7 @@ class _LandingScreenState extends State<LandingScreen> {
             child: Column(
               children: [
                 // 🔄 weather strip
-                if (temperature != null && windspeed != null)
+                /*if (temperature != null && windspeed != null)
                   Container(
                     width: double.infinity,
                     color: Colors.black54,
@@ -199,13 +203,42 @@ class _LandingScreenState extends State<LandingScreen> {
                       style: const TextStyle(color: Colors.white, fontSize: 14),
                     ),
                   ),
+                  */
+                // ─── 1) WEATHER STRIP ─────────────────────────────────────
+                if (temperature != null && windspeed != null)
+                  Align(
+                    alignment: Alignment.topCenter,
+                    child: Container(
+                      width: MediaQuery
+                          .of(context)
+                          .size
+                          .width * 0.6,
+                      // ← PLAY WITH: 0.5, 0.6, 0.7…
+                      height: 30.0,
+                      // ← PLAY WITH: try 30, 35, 40…
+                      alignment: Alignment.center,
+                      color: Colors.black54,
+                      child: Text(
+                        '${temperature!.toStringAsFixed(
+                            1)}°C · Wind: ${windspeed!.toStringAsFixed(
+                            1)} km/h',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14, // ← PLAY WITH: 12, 14, 16…
+                        ),
+                      ),
+                    ),
+                  ),
 
                 // make everything else scrollable
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: kDefaultPadding,
-                      vertical: kMediumSpacing,
+                    padding: const EdgeInsets.fromLTRB(
+                      kDefaultPadding, // left
+                      8.0, // top    ← PLAY WITH: try 4, 8, 12…
+                      kDefaultPadding, // right
+                      8.0, // bottom ← PLAY WITH: try 8, 16, 24…
                     ),
                     child: Column(
                       children: [
@@ -213,26 +246,30 @@ class _LandingScreenState extends State<LandingScreen> {
                         SizedBox(
                           width: kLogoSize,
                           height: kLogoSize,
-                          child: Image.asset('assets/logo.jpeg', fit: BoxFit.contain),
+                          child: Image.asset('assets/logo.jpeg', fit: BoxFit
+                              .contain),
                         ),
                         const SizedBox(height: kMediumSpacing),
                         Text(
                           'Welcome to CropHealthAI',
                           style: theme.textTheme.headlineMedium
-                              ?.copyWith(fontWeight: FontWeight.bold, color: Colors.white),
+                              ?.copyWith(fontWeight: FontWeight.bold,
+                              color: Colors.white),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: kSmallSpacing),
                         Text(
                           'AI-powered crop diagnosis in your pocket',
-                          style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                              color: Colors.white70),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: kSmallSpacing),
                         Text(
                           'Kilimo Bora kutumia technologia ya AI',
                           style: theme.textTheme.bodyMedium
-                              ?.copyWith(fontStyle: FontStyle.italic, color: Colors.white70),
+                              ?.copyWith(fontStyle: FontStyle.italic,
+                              color: Colors.white70),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: kMediumSpacing * 1.5),
@@ -246,19 +283,22 @@ class _LandingScreenState extends State<LandingScreen> {
                               label: 'Take\npicture',
                               color: primaryColor,
                             ),
-                            const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white70),
+                            const Icon(Icons.arrow_forward_ios, size: 16,
+                                color: Colors.white70),
                             _StepItem(
                               icon: Icons.analytics,
                               label: 'See\ndiag.',
                               color: primaryColor,
                             ),
-                            const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white70),
+                            const Icon(Icons.arrow_forward_ios, size: 16,
+                                color: Colors.white70),
                             _StepItem(
                               icon: Icons.science,
                               label: 'Get\ntreatment',
                               color: primaryColor,
                             ),
-                            const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white70),
+                            const Icon(Icons.arrow_forward_ios, size: 16,
+                                color: Colors.white70),
                             _StepItem(
                               icon: Icons.motorcycle,
                               label: 'Get\ndelivery',
@@ -276,7 +316,11 @@ class _LandingScreenState extends State<LandingScreen> {
 
                         // ─── login buttons ─────────────────────────
                         SizedBox(
-                          width: double.infinity,
+                          //width: double.infinity,
+                          width: MediaQuery
+                              .of(context)
+                              .size
+                              .width * 0.6,
                           height: kButtonHeight,
                           child: ElevatedButton.icon(
                             icon: const Icon(Icons.email),
@@ -288,18 +332,25 @@ class _LandingScreenState extends State<LandingScreen> {
                                 borderRadius: BorderRadius.circular(8),
                               ),
                             ),
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const LoginScreen()),
-                            ),
+                            onPressed: () =>
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) => const LoginScreen()),
+                                ),
                           ),
                         ),
                         const SizedBox(height: kMediumSpacing),
                         SizedBox(
-                          width: double.infinity,
+                          //width: double.infinity,
+                          width: MediaQuery
+                              .of(context)
+                              .size
+                              .width * 0.6,
                           height: kButtonHeight,
                           child: OutlinedButton.icon(
-                            icon: Icon(Icons.phone_android, color: primaryColor),
+                            icon: Icon(
+                                Icons.phone_android, color: primaryColor),
                             label: Text(
                               'Login / Sign Up via Phone',
                               style: TextStyle(
@@ -314,9 +365,37 @@ class _LandingScreenState extends State<LandingScreen> {
                                 borderRadius: BorderRadius.circular(8),
                               ),
                             ),
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const PhoneRegistrationScreen()),
+                            onPressed: () =>
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (
+                                      _) => const PhoneRegistrationScreen()),
+                                ),
+                          ),
+                        ),
+                        // ─── chat button ───────────────────────────
+                        const SizedBox(height: kMediumSpacing),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: SizedBox(
+                            height: 40, // ← PLAY WITH: try 30, 35, 40, etc.
+                            child: FloatingActionButton.extended(
+                              onPressed: () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text(
+                                      'Chat feature coming soon!')),
+                                );
+                              },
+                              icon: const Icon(
+                                  Icons.chat_bubble_outline, size: 20),
+                              label: const Text(
+                                'Ask an Expert',
+                                style: TextStyle(
+                                    fontSize: 12), // ← PLAY WITH: 10, 12, 14…
+                              ),
+                              elevation: 6,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
                             ),
                           ),
                         ),
@@ -331,8 +410,7 @@ class _LandingScreenState extends State<LandingScreen> {
       ),
     );
   }
-} // end of _LandingScreenState
-
+}
 class _StepItem extends StatelessWidget {
   final IconData icon;
   final String label;

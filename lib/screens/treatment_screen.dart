@@ -36,6 +36,11 @@ class _TreatmentScreenState extends State<TreatmentScreen> {
   }
 
   Future<void> _loadTreatment() async {
+    setState(() {
+      _isLoading = true;
+      _errorMsg = null;
+    });
+
     try {
       // 1) Request location permission
       var permission = await Geolocator.checkPermission();
@@ -44,7 +49,7 @@ class _TreatmentScreenState extends State<TreatmentScreen> {
       }
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
-        throw 'Location permission is required';
+        throw 'Location permission is required to find nearby services.';
       }
 
       // 2) Get current position
@@ -54,6 +59,7 @@ class _TreatmentScreenState extends State<TreatmentScreen> {
 
       // 3) Fetch from backend
       final encodedDisease = Uri.encodeComponent(widget.disease.trim());
+      // ✅ UPDATED: ensure route matches app.py's /utils/treatments/<disease>
       final uri = Uri.parse(
         '$backendBaseURL/utils/treatments/$encodedDisease'
             '?latitude=${pos.latitude}&longitude=${pos.longitude}',
@@ -65,15 +71,22 @@ class _TreatmentScreenState extends State<TreatmentScreen> {
       }
 
       final data = json.decode(resp.body) as Map<String, dynamic>;
+
       setState(() {
         _treatmentText = data['treatment'] as String?;
+
         _imageUrls = (data['treatment_images'] as List?)
-            ?.map((e) => e as String)
+            ?.whereType<String>()
             .toList();
+
         _agrovets = (data['agrovets'] as List?)
-            ?.cast<Map<String, dynamic>>();
+            ?.map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+
         _extensionWorkers = (data['extension_workers'] as List?)
-            ?.cast<Map<String, dynamic>>();
+            ?.map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+
         _isLoading = false;
       });
     } catch (e) {
@@ -98,13 +111,15 @@ class _TreatmentScreenState extends State<TreatmentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Treatment: ${widget.disease}'),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _errorMsg != null
+          : (_errorMsg != null
           ? Center(child: Text('Error: $_errorMsg'))
           : SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -118,13 +133,13 @@ class _TreatmentScreenState extends State<TreatmentScreen> {
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: _imageUrls!.length,
-                  separatorBuilder: (_, __) =>
-                  const SizedBox(width: 8),
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
                   itemBuilder: (_, i) => ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: Image.network(
                       _imageUrls![i],
                       fit: BoxFit.cover,
+                      width: 200,
                     ),
                   ),
                 ),
@@ -136,9 +151,7 @@ class _TreatmentScreenState extends State<TreatmentScreen> {
             if (_treatmentText != null) ...[
               Text(
                 'Recommendation',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleLarge
+                style: theme.textTheme.titleLarge
                     ?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
@@ -150,20 +163,17 @@ class _TreatmentScreenState extends State<TreatmentScreen> {
             if (_agrovets != null && _agrovets!.isNotEmpty) ...[
               Text(
                 'Nearby Agrovets',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleLarge
+                style: theme.textTheme.titleLarge
                     ?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               ..._agrovets!.map((a) => Card(
                 child: ListTile(
                   title: Text(a['name'] ?? 'Unknown'),
-                  subtitle:
-                  Text('${a['county']}, ${a['town']}'),
+                  subtitle: Text('${a['county']}, ${a['town']}'),
                   trailing: IconButton(
                     icon: const Icon(Icons.phone),
-                    onPressed: () => _dial(a['contact']),
+                    onPressed: () => _dial(a['contact'] as String?),
                   ),
                 ),
               )),
@@ -175,9 +185,7 @@ class _TreatmentScreenState extends State<TreatmentScreen> {
                 _extensionWorkers!.isNotEmpty) ...[
               Text(
                 'Extension Workers',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleLarge
+                style: theme.textTheme.titleLarge
                     ?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
@@ -186,18 +194,17 @@ class _TreatmentScreenState extends State<TreatmentScreen> {
                   title: Text(
                     '${w['first_name'] ?? ''} ${w['last_name'] ?? ''}',
                   ),
-                  subtitle:
-                  Text('${w['county']}, ${w['town']}'),
+                  subtitle: Text('${w['county']}, ${w['town']}'),
                   trailing: IconButton(
                     icon: const Icon(Icons.phone),
-                    onPressed: () => _dial(w['contact']),
+                    onPressed: () => _dial(w['contact'] as String?),
                   ),
                 ),
               )),
             ],
           ],
         ),
-      ),
+      )),
     );
   }
 }

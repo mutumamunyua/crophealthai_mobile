@@ -99,17 +99,24 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
         _diagnosis  = result['prediction']?.toString() ?? 'Unknown';
         _confidence = result['confidence']?.toString()    ?? '0';
 
-        // ✅ UPDATED: parse treatmentText directly, not nested map
-        _treatmentText   = result['treatment'] as String?;
+        // ─── TREATMENT TEXT (may now be nested object) ──────────────
+        final treatmentObj = result['treatment'];
+        if (treatmentObj is String) {
+          _treatmentText = treatmentObj;
+        } else if (treatmentObj is Map<String, dynamic>) {
+          _treatmentText = treatmentObj['text'] as String?;
+        } else {
+          _treatmentText = null;
+        }
 
         // ✅ UPDATED: treatment_images key
-        _treatmentImages = List<String>.from(result['treatment_images'] ?? []);
+        _treatmentImages  = List<String>.from(result['treatment_images'] ?? []);
 
         // ✅ UPDATED: top-level agrovets & extension_workers
         _agrovets         = List<dynamic>.from(result['agrovets'] ?? []);
         _extensionWorkers = List<dynamic>.from(result['extension_workers'] ?? []);
 
-        _isLoading        = false;
+        _isLoading = false;
       });
     } else {
       setState(() => _isLoading = false);
@@ -150,7 +157,7 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
             width: double.infinity,
             decoration: const BoxDecoration(
               image: DecorationImage(
-                image: AssetImage('assets/bg_sunrise.png'),
+                image: AssetImage('assets/bg_sunrise.jpeg'),
                 fit: BoxFit.cover,
               ),
             ),

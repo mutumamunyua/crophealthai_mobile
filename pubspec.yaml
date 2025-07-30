@@ -47,6 +47,6 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/bg_sunrise.png
+    - assets/bg_sunrise.jpeg
     - assets/logo.jpeg
     - assets/phone_verification.jpeg
