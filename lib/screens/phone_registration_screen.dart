@@ -9,12 +9,14 @@ import 'package:http/http.dart' as http;
 import '../config.dart';          // for backendBaseURL
 import 'diagnose_screen.dart';    // navigate on success
 
+const Color kPhoneBackground = Color(0xFFE8F5E9);
+const Color kPhoneBackgroundLighter = Color(0xFFF0F9F0); // Slightly lighter
+const Color kPhoneBackgroundDarker = Color(0xFFDCEADD); // Slightly darker
+
 //==============================================================================
 // MAIN AUTHENTICATION SCREEN (ENTRY POINT)
 //==============================================================================
 
-/// The main entry widget for the phone authentication flow.
-/// It directs the user to the LoginPage.
 class PhoneRegistrationScreen extends StatelessWidget {
   const PhoneRegistrationScreen({Key? key}) : super(key: key);
 
@@ -27,11 +29,9 @@ class PhoneRegistrationScreen extends StatelessWidget {
 }
 
 //==============================================================================
-// 1. LOGIN PAGE
+// 1. PHONE LOGIN PAGE
 //==============================================================================
 
-/// Displays the login form with a modern UI and provides navigation
-/// to Register and Reset PIN pages.
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
 
@@ -91,11 +91,12 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.lightBlue.shade50,
       body: Container(
         // A beautiful gradient background for a modern look.
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Colors.green.shade400, Colors.green.shade600],
+            colors: [Colors.lightBlue.shade100, Colors.lightBlue.shade300],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -144,10 +145,10 @@ class _LoginPageState extends State<LoginPage> {
                       children: [
                         // Phone Field with updated styling
                         IntlPhoneField(
-                          style: const TextStyle(color: Colors.white),
+                          style: const TextStyle(color: Colors.black87),
                           decoration: _buildInputDecoration('Phone Number'),
-                          dropdownTextStyle: const TextStyle(color: Colors.white),
-                          dropdownIcon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+                          dropdownTextStyle: const TextStyle(color: Colors.black87),
+                          dropdownIcon: const Icon(Icons.arrow_drop_down, color: Colors.black87),
                           initialCountryCode: 'KE',
                           keyboardType: TextInputType.phone,
                           onChanged: (p) {
@@ -162,7 +163,7 @@ class _LoginPageState extends State<LoginPage> {
                         TextField(
                           controller: _pinCtrl,
                           obscureText: true,
-                          style: const TextStyle(color: Colors.white),
+                          style: const TextStyle(color: Colors.black87),
                           keyboardType: TextInputType.number,
                           maxLength: 4,
                           decoration: _buildInputDecoration('Enter PIN'),
@@ -175,7 +176,7 @@ class _LoginPageState extends State<LoginPage> {
                           child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.white,
-                              foregroundColor: Colors.green,
+                              foregroundColor: Colors.blue.shade900,
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -184,10 +185,10 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             onPressed: _loading ? null : _loginWithPin,
                             child: _loading
-                                ? const SizedBox(
+                                ? SizedBox(
                                 width: 20,
                                 height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.deepPurple))
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.blue.shade900))
                                 : const Text('LOGIN', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                           ),
                         ),
@@ -220,15 +221,15 @@ class _LoginPageState extends State<LoginPage> {
   InputDecoration _buildInputDecoration(String label) {
     return InputDecoration(
       labelText: label,
-      labelStyle: TextStyle(color: Colors.white.withOpacity(0.8)),
+      labelStyle: TextStyle(color: Colors.black87.withOpacity(0.8)),
       counterText: '',
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.white.withOpacity(0.5)),
+        borderSide: BorderSide(color: Colors.lightBlue.shade200),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.white, width: 2),
+        borderSide: BorderSide(color: Colors.lightBlue.shade400, width: 2),
       ),
     );
   }
@@ -295,7 +296,6 @@ class _LoginPageState extends State<LoginPage> {
 // 2. REGISTRATION PAGE
 //==============================================================================
 
-/// A separate page for new user registration with a clean UI.
 class RegisterPage extends StatefulWidget {
   const RegisterPage({Key? key}) : super(key: key);
   @override
@@ -397,11 +397,11 @@ class _RegisterPageState extends State<RegisterPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_otpSent ? 'Verify Phone' : 'Create Account'),
-        backgroundColor: Colors.green.shade400,
+        backgroundColor: Colors.blue.shade400,
         elevation: 0,
       ),
       body: Container(
-        color: Colors.grey[100],
+        color: Colors.lightBlue.shade50,
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -409,11 +409,19 @@ class _RegisterPageState extends State<RegisterPage> {
             children: [
               if (!_otpSent) ...[
                 IntlPhoneField(
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Phone Number',
                     border: OutlineInputBorder(),
                     filled: true,
                     fillColor: Colors.white,
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.blue.shade400, width: 2),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.blue.shade200),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
                   ),
                   initialCountryCode: 'KE',
                   onChanged: (p) => _rawPhone = p.completeNumber,
@@ -425,12 +433,20 @@ class _RegisterPageState extends State<RegisterPage> {
                   obscureText: true,
                   keyboardType: TextInputType.number,
                   maxLength: 4,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Set PIN (4 digits)',
                     border: OutlineInputBorder(),
                     filled: true,
                     fillColor: Colors.white,
                     counterText: '',
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.blue.shade400, width: 2),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.blue.shade200),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -439,19 +455,27 @@ class _RegisterPageState extends State<RegisterPage> {
                   obscureText: true,
                   keyboardType: TextInputType.number,
                   maxLength: 4,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Confirm PIN',
                     border: OutlineInputBorder(),
                     filled: true,
                     fillColor: Colors.white,
                     counterText: '',
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.blue.shade400, width: 2),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.blue.shade200),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: Colors.green.shade400,
+                    backgroundColor: Colors.blue.shade400,
                   ),
                   onPressed: _loading ? null : _sendOtp,
                   child: _loading
@@ -469,19 +493,27 @@ class _RegisterPageState extends State<RegisterPage> {
                   controller: _otpCtrl,
                   keyboardType: TextInputType.number,
                   maxLength: 6,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Enter OTP',
                     border: OutlineInputBorder(),
                     filled: true,
                     fillColor: Colors.white,
                     counterText: '',
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.blue.shade400, width: 2),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.blue.shade200),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: Colors.green.shade400,
+                    backgroundColor: Colors.blue.shade400,
                   ),
                   onPressed: _loading ? null : _verifyAndRegister,
                   child: _loading
@@ -589,7 +621,7 @@ class _ResetPinPageState extends State<ResetPinPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('✅ PIN updated! Please login with new PIN'),
-            backgroundColor: Colors.green,
+            backgroundColor: Colors.blue,
           ),
         );
         // Pop back to the Login Page
@@ -614,11 +646,11 @@ class _ResetPinPageState extends State<ResetPinPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_otpSent ? 'Verify & Reset' : 'Reset PIN'),
-        backgroundColor: Colors.green.shade600,
+        backgroundColor: Colors.blue.shade600,
         elevation: 0,
       ),
       body: Container(
-        color: Colors.grey[100],
+        color: Colors.lightBlue.shade50,
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -626,11 +658,19 @@ class _ResetPinPageState extends State<ResetPinPage> {
             children: [
               if (!_otpSent) ...[
                 IntlPhoneField(
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Phone Number',
                     border: OutlineInputBorder(),
                     filled: true,
                     fillColor: Colors.white,
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.blue.shade400, width: 2),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.blue.shade200),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
                   ),
                   initialCountryCode: 'KE',
                   keyboardType: TextInputType.phone,
@@ -644,7 +684,7 @@ class _ResetPinPageState extends State<ResetPinPage> {
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: Colors.green.shade600,
+                    backgroundColor: Colors.blue.shade600,
                   ),
                   onPressed: _loading ? null : _sendOtp,
                   child: _loading
@@ -659,12 +699,20 @@ class _ResetPinPageState extends State<ResetPinPage> {
                   controller: _otpCtrl,
                   keyboardType: TextInputType.number,
                   maxLength: 6,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Enter OTP',
                     border: OutlineInputBorder(),
                     filled: true,
                     fillColor: Colors.white,
                     counterText: '',
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.blue.shade400, width: 2),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.blue.shade200),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -673,12 +721,20 @@ class _ResetPinPageState extends State<ResetPinPage> {
                   obscureText: true,
                   keyboardType: TextInputType.number,
                   maxLength: 4,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'New PIN',
                     border: OutlineInputBorder(),
                     filled: true,
                     fillColor: Colors.white,
                     counterText: '',
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.blue.shade400, width: 2),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.blue.shade200),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -687,19 +743,27 @@ class _ResetPinPageState extends State<ResetPinPage> {
                   obscureText: true,
                   keyboardType: TextInputType.number,
                   maxLength: 4,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Confirm PIN',
                     border: OutlineInputBorder(),
                     filled: true,
                     fillColor: Colors.white,
                     counterText: '',
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.blue.shade400, width: 2),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.blue.shade200),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: Colors.green.shade600,
+                    backgroundColor: Colors.blue.shade600,
                   ),
                   onPressed: _loading ? null : _verifyAndReset,
                   child: _loading

@@ -8,7 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
 import 'diagnose_screen.dart';
 
-const Color kLoginBackground = Color(0xFFF5F5F5);
+const Color kLoginBackground = Color(0xFFE8F5E9);
 
 /// ─────────────────────────────────────────────────────────────────────────────
 /// 1) EMAIL LOGIN SCREEN
@@ -74,7 +74,17 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: kLoginBackground,
       // ◀ ensures scaffold itself is off-white
-      appBar: AppBar(title: const Text('Email Login')),
+      appBar: AppBar(
+        // ◀ UPDATED: elegant Poppins header
+        title: const Text(
+          'Email Login',
+          style: TextStyle(
+            fontFamily: 'Poppins',
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
 
       // ─── BODY: full-screen container to paint kLoginBackground everywhere ───
       body: Container(
@@ -149,7 +159,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: const StadiumBorder(),
                         textStyle: const TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.w600
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          fontFamily: 'Poppins',
                         ),
                         elevation: 4,
                       ),
@@ -160,7 +172,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           color: Colors.white, strokeWidth: 2,
                         ),
                       )
-                          : const Text('Login'),
+                          : const Text(
+                          'Login',
+                        style: TextStyle(fontFamily: 'Poppins'), // ◀ UPDATED
+                      ),
                     ),
                   ),
 
@@ -176,7 +191,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text("Don't have an account? "),
+                      const Text(
+                          "Don't have an account? ",
+                          style: TextStyle(fontFamily: 'Poppins'),
+                      ),
                       TextButton(
                         onPressed: () =>
                             Navigator.push(
@@ -186,8 +204,10 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                         style: TextButton.styleFrom(
                           foregroundColor: secondaryColor,
-                          textStyle: const TextStyle(fontWeight: FontWeight
-                              .w600),
+                          textStyle: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'Poppins'
+                          ),
                         ),
                         child: const Text('Register'),
                       ),
@@ -204,7 +224,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                     style: TextButton.styleFrom(
                       foregroundColor: secondaryColor,
-                      textStyle: const TextStyle(fontWeight: FontWeight.w600),
+                      textStyle: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                      fontFamily: 'Poppins'
+                      ),
                     ),
                     child: const Text('Forgot Password?'),
                   ),
