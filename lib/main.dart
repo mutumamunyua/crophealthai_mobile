@@ -11,7 +11,6 @@ import 'screens/diagnose_screen.dart';
 import 'screens/treatment_screen.dart';
 import 'screens/chat_screen.dart';
 import 'firebase_options.dart';
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(

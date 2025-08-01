@@ -75,6 +75,7 @@ class _LoginPageState extends State<LoginPage> {
       } else {
         final body = jsonDecode(resp.body);
         setState(() => _error = body['error'] ?? 'Login failed');
+        //setState(() => _error = resp.body);
       }
     } catch (e) {
       setState(() => _error = 'Error: $e');
