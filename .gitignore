@@ -1,37 +1,49 @@
-# Flutter & Dart
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+
+# IntelliJ
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# Flutter/Dart packages
 .dart_tool/
 .packages
 build/
-pubspec.lock
 
-# IDE
-.idea/
-*.iml
-
-# Xcode
-ios/Pods/
-ios/Runner/Debug.xcconfig
-ios/Runner/Release.xcconfig
-macos/Pods/
-macos/Runner/Flutter-*.xcconfig
-macos/Podfile
-macos/Podfile.lock
-
-# macOS Finder metadata
-.DS_Store
-
-# Flutter “plugin registrant” files (auto-generated)
+# Flutter/Dart/Pub plugins
 .flutter-plugins
 .flutter-plugins-dependencies
+.pub-cache/
 
-# Firebase config files (keep these out of source control; each dev will generate their own)
-android/app/google-services.json
-ios/Runner/GoogleService-Info.plist
-macos/Runner/GoogleService-Info.plist
-lib/firebase_options.dart
-firebase.json
+# Android Studio
+captures/
+.externalNativeBuild/
+*.apk
+*.ap_
 
-# (Optional) if you have an assets/ dir generated locally and not meant for repo
-# assets/
+# Xcode
+*.hmap
+*.ipa
+*.o
+*.xccheckout
+*.xcscmblueprint
+*.xcscheme
+*.xcworkspace
+*.xcworkspacedata
+.generated/
+DerivedData/
+xcuserdata/
 
-# End of additions
+# Cocoapods
+Pods/
+Podfile.lock

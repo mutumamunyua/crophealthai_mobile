@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.crophealthai_mobile">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- ─── Add these two lines ──────────────────────── -->
     <uses-permission android:name="android.permission.INTERNET"/>

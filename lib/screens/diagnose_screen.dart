@@ -12,14 +12,16 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'treatment_screen.dart';
 import 'phone_registration_screen.dart';
+import '../widgets/news_banner.dart';
 import '../config.dart';
+import 'professional_registration_screen.dart';
+// 🔴 ADDED: Import for the LandingScreen to navigate to on logout
+import 'landing_screen.dart';
 
-// ─── SPACING CONSTANTS ─────────────────────────────────────────────────
 const double kDefaultPadding = 24.0;
 const double kSmallSpacing = 12.0;
 const double kMediumSpacing = 24.0;
-const double kButtonHeight = 50.0;
-const double kImageDisplayHeight = 220.0;
+const double kImageDisplayHeight = 180.0;
 
 class DiagnoseScreen extends StatefulWidget {
   const DiagnoseScreen({Key? key}) : super(key: key);
@@ -32,24 +34,16 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
   Uint8List? _imageBytes;
   bool _isLoading = false;
   String _processingMessage = '';
-
-  // State for successful diagnosis result
   String? _diagnosis;
   String? _confidence;
-
-  // ✅ FIX: Changed to `dynamic` to correctly handle String or List from backend.
   dynamic _treatmentData;
-
   List<String>? _treatmentImages;
   List<dynamic>? _agrovets;
   List<dynamic>? _extensionWorkers;
-
-  // State for fallback when image quality is poor
   List<dynamic>? _fallbackWorkers;
 
   final ImagePicker _picker = ImagePicker();
 
-  // Helper to clear all previous results and states
   void _resetState() {
     setState(() {
       _isLoading = false;
@@ -57,7 +51,7 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
       _processingMessage = '';
       _diagnosis = null;
       _confidence = null;
-      _treatmentData = null; // Changed from _treatmentText
+      _treatmentData = null;
       _treatmentImages = null;
       _agrovets = null;
       _extensionWorkers = null;
@@ -77,16 +71,18 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
 
     if (permission == LocationPermission.deniedForever) return null;
 
-    return await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high);
   }
 
+  // 🔴 MODIFIED: Changed navigation to go back to LandingScreen
   Future<void> _logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('token');
     if (context.mounted) {
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (context) => const PhoneRegistrationScreen()),
+        MaterialPageRoute(builder: (context) => const LandingScreen()), // Changed from PhoneRegistrationScreen
             (Route<dynamic> route) => false,
       );
     }
@@ -98,10 +94,11 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
     final bytes = await picked.readAsBytes();
 
     setState(() {
-      _resetState();
       _isLoading = true;
       _imageBytes = bytes;
       _processingMessage = 'Connecting to server...';
+      _diagnosis = null;
+      _fallbackWorkers = null;
     });
 
     await _connectToSSE(bytes);
@@ -109,14 +106,15 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
 
   Future<void> _connectToSSE(Uint8List imageData) async {
     final pos = await _getCurrentLocation();
-    final lat = pos?.latitude.toString()  ?? '0.00';
+    final lat = pos?.latitude.toString() ?? '0.00';
     final lon = pos?.longitude.toString() ?? '0.00';
 
     final uri = Uri.parse('$backendBaseURL/upload-sse');
     var request = http.MultipartRequest('POST', uri)
-      ..fields['latitude']  = lat
+      ..fields['latitude'] = lat
       ..fields['longitude'] = lon
-      ..files.add(http.MultipartFile.fromBytes('files', imageData, filename: 'leaf.jpg'));
+      ..files.add(
+          http.MultipartFile.fromBytes('files', imageData, filename: 'leaf.jpg'));
 
     final client = http.Client();
     try {
@@ -130,51 +128,65 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
           final dataString = event.substring(5).trim();
           if (dataString.isEmpty) return;
           final data = jsonDecode(dataString) as Map<String, dynamic>;
-
           final step = data['step'] as String?;
 
-          setState(() {
-            _processingMessage = data['message'] as String? ?? _processingMessage;
-          });
+          if (mounted) {
+            setState(() {
+              _processingMessage =
+                  data['message'] as String? ?? _processingMessage;
+            });
+          }
 
           if (step == 'result') {
             final result = data['result'] as Map<String, dynamic>;
-            setState(() {
-              _diagnosis = result['disease'] as String?;
-              _confidence = (result['confidence'] as num?)?.toStringAsFixed(2);
-              _isLoading = false;
-            });
-            _fetchFullTreatment(_diagnosis!);
-
+            if (mounted) {
+              setState(() {
+                _diagnosis = result['disease'] as String?;
+                _confidence =
+                    (result['confidence'] as num?)?.toStringAsFixed(2);
+                _isLoading = false;
+              });
+            }
+            if (_diagnosis != null) {
+              _fetchFullTreatment(_diagnosis!);
+            }
           } else if (step == 'fallback') {
-            setState(() {
-              _fallbackWorkers = data['workers'] as List<dynamic>?;
-              _isLoading = false;
-            });
+            if (mounted) {
+              setState(() {
+                _fallbackWorkers = data['workers'] as List<dynamic>?;
+                _isLoading = false;
+              });
+            }
           } else if (step == 'complete' || step == 'error') {
             if (_diagnosis == null && _fallbackWorkers == null) {
-              setState(() {
-                _isLoading = false;
-                _processingMessage = data['error'] ?? 'An unknown error occurred.';
-              });
+              if (mounted) {
+                setState(() {
+                  _isLoading = false;
+                  _processingMessage =
+                      data['error'] ?? 'An unknown error occurred.';
+                });
+              }
             }
           }
         }
       }, onDone: () {
         client.close();
       }, onError: (error) {
-        setState(() {
-          _isLoading = false;
-          _processingMessage = 'Failed to connect: $error';
-        });
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _processingMessage = 'Failed to connect: $error';
+          });
+        }
         client.close();
       });
-
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _processingMessage = 'An error occurred: $e';
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _processingMessage = 'An error occurred: $e';
+        });
+      }
       client.close();
     }
   }
@@ -185,17 +197,18 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
       final lat = pos?.latitude.toString() ?? '0.0';
       final lon = pos?.longitude.toString() ?? '0.0';
 
-      final uri = Uri.parse('$backendBaseURL/utils/treatments/${Uri.encodeComponent(diseaseName)}?latitude=$lat&longitude=$lon');
+      final uri = Uri.parse(
+          '$backendBaseURL/utils/treatments/${Uri.encodeComponent(diseaseName)}?latitude=$lat&longitude=$lon');
       final resp = await http.get(uri);
 
-      if (resp.statusCode == 200) {
+      if (mounted && resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
         setState(() {
-          // ✅ FIX: Assign the raw `treatment` data (String or List) to the dynamic variable.
           _treatmentData = data['treatment'];
           _treatmentImages = List<String>.from(data['treatment_images'] ?? []);
           _agrovets = List<dynamic>.from(data['agrovets'] ?? []);
-          _extensionWorkers = List<dynamic>.from(data['extension_workers'] ?? []);
+          _extensionWorkers =
+          List<dynamic>.from(data['extension_workers'] ?? []);
         });
       } else {
         throw Exception('Failed to load treatment details');
@@ -203,8 +216,7 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Could not load treatment: ${e.toString()}'))
-        );
+            SnackBar(content: Text('Could not load treatment: ${e.toString()}')));
       }
     }
   }
@@ -219,20 +231,20 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Crop Diagnosis'),
-        actions: [ IconButton(icon: const Icon(Icons.logout), onPressed: _logout) ],
+        actions: [
+          IconButton(icon: const Icon(Icons.logout), onPressed: _logout)
+        ],
       ),
       body: Column(
         children: [
-          if (!_isLoading && _diagnosis == null && _fallbackWorkers == null)
-            _buildPickerControls(theme),
+          if (_imageBytes == null) _buildPickerControls(),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(kDefaultPadding),
-              child: _buildContentArea(theme),
+              child: _buildContentArea(),
             ),
           ),
         ],
@@ -240,12 +252,13 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
     );
   }
 
-  Widget _buildPickerControls(ThemeData theme) {
+  Widget _buildPickerControls() {
     return Container(
       height: MediaQuery.of(context).size.height * 0.4,
       width: double.infinity,
       decoration: const BoxDecoration(
-        image: DecorationImage(image: AssetImage('assets/bg_sunrise.jpeg'), fit: BoxFit.cover),
+        image: DecorationImage(
+            image: AssetImage('assets/bg_sunrise.jpeg'), fit: BoxFit.cover),
       ),
       child: Center(
         child: Column(
@@ -255,14 +268,18 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
               onPressed: () => _pickAndProcess(ImageSource.camera),
               icon: const Icon(Icons.camera_alt),
               label: const Text('Take a Picture'),
-              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12)),
+              style: ElevatedButton.styleFrom(
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 12)),
             ),
             const SizedBox(height: kMediumSpacing),
             ElevatedButton.icon(
               onPressed: () => _pickAndProcess(ImageSource.gallery),
               icon: const Icon(Icons.photo_library),
               label: const Text('Choose from Gallery'),
-              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12)),
+              style: ElevatedButton.styleFrom(
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 12)),
             ),
           ],
         ),
@@ -270,47 +287,72 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
     );
   }
 
-  Widget _buildContentArea(ThemeData theme) {
+  Widget _buildContentArea() {
+    final theme = Theme.of(context);
     if (_imageBytes == null) {
-      return const Center(child: Text('Please select an image to diagnose.'));
-    }
-    if (_isLoading) {
       return Column(
         children: [
-          Image.memory(_imageBytes!, height: kImageDisplayHeight, fit: BoxFit.cover, width: double.infinity),
-          const SizedBox(height: kMediumSpacing),
-          const CircularProgressIndicator(),
+          const Center(child: Text('Please select an image to diagnose.')),
           const SizedBox(height: kSmallSpacing),
-          Text(_processingMessage, style: theme.textTheme.titleMedium, textAlign: TextAlign.center),
+          _buildTitledNewsBanner(),
+          const SizedBox(height: kMediumSpacing),
+          _buildRegistrationButtons(),
         ],
       );
     }
-    if (_fallbackWorkers != null) {
-      return _buildFallbackUI(theme);
-    }
-    if (_diagnosis != null) {
-      return _buildSuccessUI(theme);
-    }
-    return Center(child: Text(_processingMessage, style: TextStyle(color: theme.colorScheme.error)));
-  }
 
-  Widget _buildSuccessUI(ThemeData theme) {
     return Column(
       children: [
-        Image.memory(_imageBytes!, height: kImageDisplayHeight, fit: BoxFit.cover, width: double.infinity),
-        const SizedBox(height: kMediumSpacing),
+        if (_isLoading) ...[
+          Image.memory(_imageBytes!,
+              height: kImageDisplayHeight,
+              fit: BoxFit.cover,
+              width: double.infinity),
+          const SizedBox(height: kMediumSpacing),
+          const CircularProgressIndicator(),
+          const SizedBox(height: kSmallSpacing),
+          Text(_processingMessage,
+              style: theme.textTheme.titleMedium, textAlign: TextAlign.center),
+          const SizedBox(height: kMediumSpacing),
+          _buildTitledNewsBanner(),
+        ],
+        if (!_isLoading && _fallbackWorkers != null) _buildFallbackUI(),
+        if (!_isLoading && _diagnosis != null) _buildSuccessUI(),
+        if (!_isLoading && _diagnosis == null && _fallbackWorkers == null)
+          Center(
+              child: Text(_processingMessage,
+                  style: TextStyle(color: theme.colorScheme.error))),
+      ],
+    );
+  }
+
+  Widget _buildSuccessUI() {
+    final theme = Theme.of(context);
+    return Column(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12.0),
+          child: Image.memory(_imageBytes!,
+              height: kImageDisplayHeight,
+              fit: BoxFit.cover,
+              width: double.infinity),
+        ),
+        const SizedBox(height: kSmallSpacing),
         Card(
-          elevation: 4,
+          elevation: 2,
           child: Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(12.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('Diagnosis Result', style: theme.textTheme.headlineSmall),
+                Text('Diagnosis Result',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                        fontFamily: 'Garamond', fontWeight: FontWeight.bold)),
                 const Divider(),
                 Text('Disease: $_diagnosis', style: theme.textTheme.titleMedium),
-                Text('Confidence: $_confidence%', style: theme.textTheme.titleMedium),
-                const SizedBox(height: kMediumSpacing),
+                Text('Confidence: $_confidence%',
+                    style: theme.textTheme.titleMedium),
+                const SizedBox(height: kSmallSpacing),
                 ElevatedButton(
                   onPressed: () {
                     Navigator.push(
@@ -318,7 +360,6 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
                       MaterialPageRoute(
                         builder: (_) => TreatmentScreen(
                           disease: _diagnosis!,
-                          // ✅ FIX: Pass the dynamic `_treatmentData` to the correct parameter.
                           treatmentData: _treatmentData,
                           imageUrls: _treatmentImages,
                           agrovets: _agrovets,
@@ -333,14 +374,110 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
             ),
           ),
         ),
+        const SizedBox(height: kMediumSpacing),
+        _buildTitledNewsBanner(),
+        const SizedBox(height: kMediumSpacing),
+        _buildRegistrationButtons(),
       ],
     );
   }
 
-  Widget _buildFallbackUI(ThemeData theme) {
+  Widget _buildTitledNewsBanner() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.newspaper, size: 20.0, color: Colors.grey.shade700),
+            const SizedBox(width: 8.0),
+            Text(
+              "FARMING NEWS & ALERTS",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Garamond',
+                color: Colors.indigo.shade900,
+              ),
+            ),
+          ],
+        ),
+        const NewsBanner(),
+      ],
+    );
+  }
+
+  Widget _buildRegistrationButtons() {
     return Column(
       children: [
-        Image.memory(_imageBytes!, height: kImageDisplayHeight, fit: BoxFit.cover, width: double.infinity),
+        const Divider(height: 32),
+        Text(
+          "Are you a professional? Help farmers find you:",
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            fontSize: 14,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: kSmallSpacing),
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.storefront, size: 18),
+                label: const Text("Register Agrovet"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFa0522d),
+                  foregroundColor: Colors.white,
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                  textStyle: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) =>
+                        const ProfessionalRegistrationScreen()),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: kSmallSpacing),
+            Expanded(
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.support_agent, size: 18),
+                label: const Text("Register Ext. Worker"),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF003366),
+                    foregroundColor: Colors.white,
+                    padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                    textStyle: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.bold)),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) =>
+                        const ProfessionalRegistrationScreen()),
+                  );
+                },
+              ),
+            ),
+          ],
+        )
+      ],
+    );
+  }
+
+  Widget _buildFallbackUI() {
+    final theme = Theme.of(context);
+    return Column(
+      children: [
+        Image.memory(_imageBytes!,
+            height: kImageDisplayHeight,
+            fit: BoxFit.cover,
+            width: double.infinity),
         const SizedBox(height: kMediumSpacing),
         Card(
           elevation: 4,
@@ -349,17 +486,22 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
             padding: const EdgeInsets.all(16.0),
             child: Column(
               children: [
-                const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 40),
+                const Icon(Icons.warning_amber_rounded,
+                    color: Colors.amber, size: 40),
                 const SizedBox(height: kSmallSpacing),
-                Text('Image Quality Too Low', style: theme.textTheme.headlineSmall),
+                Text('Image Quality Too Low',
+                    style: theme.textTheme.headlineSmall),
                 const SizedBox(height: kSmallSpacing),
                 Text(_processingMessage, textAlign: TextAlign.center),
                 const SizedBox(height: kMediumSpacing),
-                const Text('Please try another image or contact a nearby expert for help:', textAlign: TextAlign.center),
+                const Text(
+                    'Please try another image or contact a nearby expert for help:',
+                    textAlign: TextAlign.center),
                 const SizedBox(height: kMediumSpacing),
                 ..._fallbackWorkers!.map((w) => Card(
                   child: ListTile(
-                    title: Text('${w['first_name'] ?? ''} ${w['last_name'] ?? ''}'),
+                    title: Text(
+                        '${w['first_name'] ?? ''} ${w['last_name'] ?? ''}'),
                     subtitle: Text('${w['town']}, ${w['county']}'),
                     trailing: IconButton(
                       icon: Icon(Icons.phone, color: theme.primaryColor),

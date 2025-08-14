@@ -1,4 +1,4 @@
-package com.example.crophealthai_mobile
+package com.nydatai.kilimoafya
 
 import io.flutter.embedding.android.FlutterActivity
 

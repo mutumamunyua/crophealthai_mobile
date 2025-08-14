@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "335031153474",
+    "project_id": "crophealthai-b3c04",
+    "storage_bucket": "crophealthai-b3c04.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:335031153474:android:8864d78a044e6213714edb",
+        "android_client_info": {
+          "package_name": "com.example.crophealthai_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJKrK7ejnh4WFnMHlb2o_9Flc81Fv0G-g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:335031153474:android:1fa6f46abc76fdda714edb",
+        "android_client_info": {
+          "package_name": "com.nydatai.kilimoafya"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJKrK7ejnh4WFnMHlb2o_9Flc81Fv0G-g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
