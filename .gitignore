@@ -47,3 +47,5 @@ xcuserdata/
 # Cocoapods
 Pods/
 Podfile.lock
+
+android/app/google-services.json
