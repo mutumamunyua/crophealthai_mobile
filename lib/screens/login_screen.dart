@@ -31,34 +31,38 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
 
-    final resp = await http.post(
-      Uri.parse('$backendBaseURL/auth/login'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'email': _emailCtrl.text.trim(),
-        'password': _passwordCtrl.text.trim(),
-      }),
-    );
+    try {
+      final resp = await http.post(
+        Uri.parse('$backendBaseURL/auth/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': _emailCtrl.text.trim(),
+          'password': _passwordCtrl.text.trim(),
+        }),
+      );
 
-    if (resp.statusCode == 200) {
-      final jwt = jsonDecode(resp.body)['token'];
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('token', jwt);
+      if (resp.statusCode == 200) {
+        final jwt = jsonDecode(resp.body)['token'];
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('token', jwt);
 
-      // ◀ CHANGED: track a 7-day expiry so user stays logged in
-      final expiry = DateTime.now().add(const Duration(days: 7));
-      await prefs.setString('tokenExpiry', expiry.toIso8601String());
+        final expiry = DateTime.now().add(const Duration(days: 7));
+        await prefs.setString('tokenExpiry', expiry.toIso8601String());
 
-      if (context.mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const DiagnoseScreen()),
-        );
+        if (context.mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const DiagnoseScreen()),
+          );
+        }
+      } else {
+        final body = jsonDecode(resp.body);
+        setState(() => _error = body['error'] ?? 'Login failed');
       }
-    } else {
-      final body = jsonDecode(resp.body);
-      setState(() => _error = body['error'] ?? 'Login failed');
+    } catch(e) {
+      setState(() => _error = 'An error occurred. Please try again.');
     }
+
 
     setState(() => _loading = false);
   }
@@ -68,14 +72,17 @@ class _LoginScreenState extends State<LoginScreen> {
     final theme = Theme.of(context);
     final primaryColor = theme.colorScheme.primary;
     final secondaryColor = theme.colorScheme.secondary;
-    final fieldBg = Colors.white.withOpacity(0.1); // ◀ your translucent fill
-    const errorColor = Color(0xFFD32F2F); // ◀ your error text
+    // 🔴 MODIFIED: Changed the field background to be solid white
+    final fieldBg = Colors.white;
+    const errorColor = Color(0xFFD32F2F);
 
     return Scaffold(
       backgroundColor: kLoginBackground,
-      // ◀ ensures scaffold itself is off-white
+      // 🔴 MODIFIED: Styled AppBar to be visible against the background
       appBar: AppBar(
-        // ◀ UPDATED: elegant Poppins header
+        backgroundColor: kLoginBackground,
+        foregroundColor: Colors.black, // Ensures title and back arrow are black
+        elevation: 0, // Removes the shadow for a flat, clean look
         title: const Text(
           'Email Login',
           style: TextStyle(
@@ -85,33 +92,30 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
-
-      // ─── BODY: full-screen container to paint kLoginBackground everywhere ───
       body: Container(
-        width: double.infinity, // ◀ NEW
-        height: double.infinity, // ◀ NEW
-        color: kLoginBackground, // ◀ NEW
-
+        width: double.infinity,
+        height: double.infinity,
+        color: kLoginBackground,
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(
-              maxWidth: 350, // ← PLAY WITH: 300, 350, 400
+              maxWidth: 350,
             ),
             child: Padding(
-              padding: const EdgeInsets.all(16), // ← PLAY WITH: overall padding
+              padding: const EdgeInsets.all(16),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // ─── Email Field ───────────────────────
                   TextField(
                     controller: _emailCtrl,
                     decoration: InputDecoration(
                       filled: true,
                       fillColor: fieldBg,
                       labelText: 'Email',
+                      // 🔴 MODIFIED: Added a visible border
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide.none,
+                        borderSide: BorderSide(color: Colors.grey.shade300),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -124,17 +128,16 @@ class _LoginScreenState extends State<LoginScreen> {
                     keyboardType: TextInputType.emailAddress,
                   ),
                   const SizedBox(height: 16),
-
-                  // ─── Password Field ────────────────────
                   TextField(
                     controller: _passwordCtrl,
                     decoration: InputDecoration(
                       filled: true,
                       fillColor: fieldBg,
                       labelText: 'Password',
+                      // 🔴 MODIFIED: Added a visible border
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide.none,
+                        borderSide: BorderSide(color: Colors.grey.shade300),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -147,8 +150,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     obscureText: true,
                   ),
                   const SizedBox(height: 24),
-
-                  // ─── Login Button ──────────────────────
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -159,8 +160,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: const StadiumBorder(),
                         textStyle: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
                           fontFamily: 'Poppins',
                         ),
                         elevation: 4,
@@ -173,27 +174,22 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       )
                           : const Text(
-                          'Login',
-                        style: TextStyle(fontFamily: 'Poppins'), // ◀ UPDATED
+                        'Login',
+                        style: TextStyle(fontFamily: 'Poppins'),
                       ),
                     ),
                   ),
-
-                  // ─── Error Message ────────────────────
                   if (_error != null) ...[
                     const SizedBox(height: 16),
                     Text(_error!, style: const TextStyle(color: errorColor)),
                   ],
-
                   const SizedBox(height: 24),
-
-                  // ─── “Don’t have an account?” ─────────
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text(
-                          "Don't have an account? ",
-                          style: TextStyle(fontFamily: 'Poppins'),
+                        "Don't have an account? ",
+                        style: TextStyle(fontFamily: 'Poppins'),
                       ),
                       TextButton(
                         onPressed: () =>
@@ -213,8 +209,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ],
                   ),
-
-                  // ─── “Forgot Password?” ───────────────
                   TextButton(
                     onPressed: () =>
                         Navigator.push(
@@ -226,7 +220,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       foregroundColor: secondaryColor,
                       textStyle: const TextStyle(
                           fontWeight: FontWeight.w600,
-                      fontFamily: 'Poppins'
+                          fontFamily: 'Poppins'
                       ),
                     ),
                     child: const Text('Forgot Password?'),
@@ -240,6 +234,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
+
 /// ─────────────────────────────────────────────────────────────────────────────
 /// 2) REGISTER SCREEN (in-file)
 /// ─────────────────────────────────────────────────────────────────────────────
@@ -273,7 +268,7 @@ class _RegisterFormState extends State<_RegisterForm> {
   final _lastNameCtrl   = TextEditingController();
   final _emailCtrl      = TextEditingController();
   final _passwordCtrl   = TextEditingController();
-  final _confirmPwdCtrl = TextEditingController();          // ◀ CHANGED
+  final _confirmPwdCtrl = TextEditingController();
 
   bool _loading = false;
   String? _error;
@@ -281,7 +276,7 @@ class _RegisterFormState extends State<_RegisterForm> {
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
     if (_passwordCtrl.text.trim() != _confirmPwdCtrl.text.trim()) {
-      setState(() => _error = 'Passwords do not match');    // ◀ CHANGED
+      setState(() => _error = 'Passwords do not match');
       return;
     }
 
@@ -302,13 +297,13 @@ class _RegisterFormState extends State<_RegisterForm> {
     );
 
     final theme          = Theme.of(context);
-    final secondaryColor = theme.colorScheme.secondary;      // ◀ CHANGED
+    final secondaryColor = theme.colorScheme.secondary;
 
     if (resp.statusCode == 201) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('✅ Registered! Check your email.'),
-          backgroundColor: secondaryColor,                   // ◀ CHANGED
+          backgroundColor: secondaryColor,
         ),
       );
       Navigator.pop(context);
@@ -324,7 +319,7 @@ class _RegisterFormState extends State<_RegisterForm> {
   Widget build(BuildContext context) {
     final theme        = Theme.of(context);
     final primaryColor = theme.colorScheme.primary;
-    final fieldBg      = Colors.white.withOpacity(0.1);
+    final fieldBg      = Colors.white; // 🔴 MODIFIED: Changed to solid white
 
     return Center(
       child: ConstrainedBox(
@@ -336,7 +331,6 @@ class _RegisterFormState extends State<_RegisterForm> {
               key: _formKey,
               child: Column(
                 children: [
-                  // — First Name —
                   TextFormField(
                     controller: _firstNameCtrl,
                     decoration: InputDecoration(
@@ -345,29 +339,7 @@ class _RegisterFormState extends State<_RegisterForm> {
                       labelText: 'First Name',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: primaryColor, width: 2),
-                      ),
-                      contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                    ),
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                  ),
-                  const SizedBox(height: 12), // ← PLAY WITH
-
-                  // — Last Name —
-                  TextFormField(
-                    controller: _lastNameCtrl,
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: fieldBg,
-                      labelText: 'Last Name',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide.none,
+                        borderSide: BorderSide(color: Colors.grey.shade300), // 🔴 MODIFIED
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -379,8 +351,26 @@ class _RegisterFormState extends State<_RegisterForm> {
                     validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                   ),
                   const SizedBox(height: 12),
-
-                  // — Email —
+                  TextFormField(
+                    controller: _lastNameCtrl,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: fieldBg,
+                      labelText: 'Last Name',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.grey.shade300), // 🔴 MODIFIED
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: primaryColor, width: 2),
+                      ),
+                      contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                    ),
+                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                  ),
+                  const SizedBox(height: 12),
                   TextFormField(
                     controller: _emailCtrl,
                     decoration: InputDecoration(
@@ -389,7 +379,7 @@ class _RegisterFormState extends State<_RegisterForm> {
                       labelText: 'Email',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide.none,
+                        borderSide: BorderSide(color: Colors.grey.shade300), // 🔴 MODIFIED
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -402,8 +392,6 @@ class _RegisterFormState extends State<_RegisterForm> {
                     validator: (v) => v != null && v.contains('@') ? null : 'Valid email',
                   ),
                   const SizedBox(height: 12),
-
-                  // — Password —
                   TextFormField(
                     controller: _passwordCtrl,
                     decoration: InputDecoration(
@@ -412,7 +400,7 @@ class _RegisterFormState extends State<_RegisterForm> {
                       labelText: 'Password',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide.none,
+                        borderSide: BorderSide(color: Colors.grey.shade300), // 🔴 MODIFIED
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -426,8 +414,6 @@ class _RegisterFormState extends State<_RegisterForm> {
                     v != null && v.length >= 8 ? null : 'Min 8 characters',
                   ),
                   const SizedBox(height: 12),
-
-                  // — Confirm Password —                      // ◀ CHANGED
                   TextFormField(
                     controller: _confirmPwdCtrl,
                     decoration: InputDecoration(
@@ -436,7 +422,7 @@ class _RegisterFormState extends State<_RegisterForm> {
                       labelText: 'Confirm Password',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide.none,
+                        borderSide: BorderSide(color: Colors.grey.shade300), // 🔴 MODIFIED
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -450,21 +436,19 @@ class _RegisterFormState extends State<_RegisterForm> {
                     v != _passwordCtrl.text ? 'Passwords do not match' : null,
                   ),
                   const SizedBox(height: 24),
-
-                  // — Register Button —
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: _loading ? null : _register,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryColor,    // ◀ CHANGED
-                        foregroundColor: Colors.white,     // ◀ CHANGED
+                        backgroundColor: primaryColor,
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
-                          vertical: 14, // ← PLAY WITH
+                          vertical: 14,
                         ),
                         shape: const StadiumBorder(),
                         textStyle: const TextStyle(
-                          fontSize: 16,  // ← PLAY WITH
+                          fontSize: 16,
                           fontWeight: FontWeight.w600,
                         ),
                         elevation: 4,
@@ -479,10 +463,9 @@ class _RegisterFormState extends State<_RegisterForm> {
                           : const Text('Register'),
                     ),
                   ),
-
                   if (_error != null) ...[
                     const SizedBox(height: 16),
-                    Text(_error!, style: TextStyle(color: Colors.red.shade700)), // ◀ CHANGED
+                    Text(_error!, style: TextStyle(color: Colors.red.shade700)),
                   ],
                 ],
               ),
@@ -552,7 +535,7 @@ class _ResetFormState extends State<_ResetForm> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Password reset email sent!'),
-            backgroundColor: Theme.of(context).colorScheme.secondary, // ◀ CHANGED
+            backgroundColor: Theme.of(context).colorScheme.secondary,
           ),
         );
       } else {
@@ -560,7 +543,7 @@ class _ResetFormState extends State<_ResetForm> {
         final err  = body['error'] ?? 'Failed to send reset link';
         setState(() => _error = err);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(err)), // ◀ CHANGED
+          SnackBar(content: Text(err)),
         );
       }
     } catch (_) {
@@ -577,8 +560,8 @@ class _ResetFormState extends State<_ResetForm> {
   Widget build(BuildContext context) {
     final theme        = Theme.of(context);
     final primaryColor = theme.colorScheme.primary;
-    final fieldBg      = Colors.white.withOpacity(0.1);
-    const errorColor   = Color(0xFFD32F2F); // ◀ CHANGED
+    final fieldBg      = Colors.white; // 🔴 MODIFIED: Changed to solid white
+    const errorColor   = Color(0xFFD32F2F);
 
     return Center(
       child: ConstrainedBox(
@@ -588,7 +571,6 @@ class _ResetFormState extends State<_ResetForm> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // — Email Field —
               TextField(
                 controller: _emailCtrl,
                 decoration: InputDecoration(
@@ -597,7 +579,7 @@ class _ResetFormState extends State<_ResetForm> {
                   labelText: 'Email',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide.none,
+                    borderSide: BorderSide(color: Colors.grey.shade300), // 🔴 MODIFIED
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -609,21 +591,19 @@ class _ResetFormState extends State<_ResetForm> {
                 keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 24),
-
-              // — Send Reset Email Button —
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: _loading ? null : _requestReset,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,    // ◀ CHANGED
-                    foregroundColor: Colors.white,     // ◀ CHANGED
+                    backgroundColor: primaryColor,
+                    foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(
-                      vertical: 14, // ← PLAY WITH
+                      vertical: 14,
                     ),
                     shape: const StadiumBorder(),
                     textStyle: const TextStyle(
-                      fontSize: 16, // ← PLAY WITH
+                      fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
                     elevation: 4,
@@ -638,18 +618,16 @@ class _ResetFormState extends State<_ResetForm> {
                       : const Text('Send Reset Email'),
                 ),
               ),
-
               if (_message != null) ...[
                 const SizedBox(height: 16),
                 Text(
                   _message!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.secondary), // ◀ CHANGED
+                  style: TextStyle(color: Theme.of(context).colorScheme.secondary),
                 ),
               ],
-
               if (_error != null) ...[
                 const SizedBox(height: 16),
-                Text(_error!, style: TextStyle(color: Colors.red.shade700)),          // ◀ CHANGED
+                Text(_error!, style: TextStyle(color: Colors.red.shade700)),
               ],
             ],
           ),
