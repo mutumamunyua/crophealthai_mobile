@@ -8,8 +8,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../config.dart';
-import '../widgets/news_banner.dart';
 import '../widgets/contact_scroller.dart';
+import 'video_library_screen.dart';
 
 class TreatmentScreen extends StatefulWidget {
   final String disease;
@@ -32,6 +32,7 @@ class TreatmentScreen extends StatefulWidget {
 }
 
 class _TreatmentScreenState extends State<TreatmentScreen> {
+  // --- STATE AND DATA FETCHING LOGIC (UNCHANGED) ---
   bool _isLoading = true;
   String? _errorMsg;
   List<String> _treatmentOptions = [];
@@ -180,7 +181,7 @@ class _TreatmentScreenState extends State<TreatmentScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.lightBlue.shade50,
+      backgroundColor: Colors.blueGrey.shade50,
       appBar: AppBar(
         title: Text('Treatment: ${widget.disease}'),
         backgroundColor: Theme.of(context).primaryColor,
@@ -193,46 +194,67 @@ class _TreatmentScreenState extends State<TreatmentScreen> {
     if (_isLoading) return const Center(child: CircularProgressIndicator());
     if (_errorMsg != null) return Center(child: Text('Error: $_errorMsg'));
     if (_noTreatmentAvailable) return _buildNoTreatmentUI();
-    return SingleChildScrollView(
+
+    return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildImageCarousel(),
-          const SizedBox(height: 16),
-          _buildTreatmentCard(),
-          const SizedBox(height: 24),
-          const NewsBanner(),
-          const SizedBox(height: 24),
-          ContactScroller(
-            title: 'Nearby Agrovets',
-            contacts: _agrovets,
-            icon: Icons.store_mall_directory,
+          const SizedBox(height: 8),
+          // 🔴 MODIFIED: Wrapped the treatment card in a Flexible widget
+          // This allows it to expand and show all text without being cut off.
+          Flexible(
+            child: _buildTreatmentCard(),
           ),
-          const SizedBox(height: 24),
-          ContactScroller(
-            title: 'Extension Workers',
-            contacts: _extensionWorkers,
-            icon: Icons.support_agent,
+          const SizedBox(height: 12),
+          Center(
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.indigo.shade800,
+                foregroundColor: Colors.white,
+                shape: const StadiumBorder(),
+              ),
+              icon: const Icon(Icons.video_library_outlined),
+              label: const Text("Open Video Library"),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const VideoLibraryScreen()),
+                );
+              },
+            ),
+          ),
+          const Divider(height: 24),
+          // This Column now holds the contact scrollers
+          Column(
+            children: [
+              ContactScroller(
+                title: 'Nearby Agrovets',
+                contacts: _agrovets,
+                icon: Icons.store_mall_directory,
+              ),
+              const SizedBox(height: 12),
+              ContactScroller(
+                title: 'Extension Workers',
+                contacts: _extensionWorkers,
+                icon: Icons.support_agent,
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  // 🔴 MODIFIED: This entire method is updated for better padding and sizing.
+  // 🔴 MODIFIED: Increased height for a more prominent image
   Widget _buildImageCarousel() {
     if (_imageUrls.isEmpty) return const SizedBox.shrink();
-    return Container(
-      height: 200, // Reduced height
-      padding: const EdgeInsets.symmetric(vertical: 8.0), // Added vertical padding
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        color: Colors.black.withOpacity(0.05),
-      ),
+    return SizedBox(
+      height: 180, // Increased height
       child: Image.network(
         _imageUrls[_currentImageIndex],
-        fit: BoxFit.contain, // Ensures the whole image is visible
+        fit: BoxFit.contain,
         width: double.infinity,
         errorBuilder: (_, __, ___) => const Center(
             child: Icon(Icons.broken_image, size: 50, color: Colors.grey)),
@@ -240,27 +262,26 @@ class _TreatmentScreenState extends State<TreatmentScreen> {
     );
   }
 
-  // 🔴 MODIFIED: This entire method is updated for a more compact card.
   Widget _buildTreatmentCard() {
     final theme = Theme.of(context);
     if (_treatmentOptions.isEmpty) return const SizedBox.shrink();
 
     return Card(
-      elevation: 2, // Reduced elevation
+      elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(12.0), // Reduced padding
+        padding: const EdgeInsets.all(12.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min, // Allows the card to wrap its content
           children: [
             Text(
               'Recommended Treatment',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                fontSize: 18, // Reduced font size
-              ),
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
             ),
-            const Divider(height: 16),
+            const Divider(height: 12),
+            // 🔴 MODIFIED: Removed maxLines to allow text to expand
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 500),
               transitionBuilder: (child, anim) =>
@@ -270,32 +291,12 @@ class _TreatmentScreenState extends State<TreatmentScreen> {
                 key: ValueKey<int>(_currentTreatmentIndex),
                 style: const TextStyle(
                   fontFamily: 'Garamond',
-                  fontSize: 16, // Reduced font size
+                  fontSize: 15,
                   color: Color(0xFF003366),
-                  height: 1.4,
+                  height: 1.3,
                 ),
               ),
             ),
-            if (_treatmentOptions.length > 1)
-              Padding(
-                padding: const EdgeInsets.only(top: 12.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(_treatmentOptions.length, (index) {
-                    return Container(
-                      width: 8.0,
-                      height: 8.0,
-                      margin: const EdgeInsets.symmetric(horizontal: 4.0),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: _currentTreatmentIndex == index
-                            ? theme.primaryColor
-                            : Colors.grey.shade300,
-                      ),
-                    );
-                  }),
-                ),
-              ),
           ],
         ),
       ),
@@ -303,7 +304,7 @@ class _TreatmentScreenState extends State<TreatmentScreen> {
   }
 
   Widget _buildNoTreatmentUI() {
-    return SingleChildScrollView(
+    return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
@@ -331,13 +332,10 @@ class _TreatmentScreenState extends State<TreatmentScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          const NewsBanner(),
-          const SizedBox(height: 24),
           ContactScroller(
-            title: 'Contact an Expert for Help',
-            contacts: _extensionWorkers,
-            icon: Icons.support_agent,
-          ),
+              title: 'Contact an Expert for Help',
+              contacts: _extensionWorkers,
+              icon: Icons.support_agent),
         ],
       ),
     );

@@ -26,22 +26,32 @@ class ContactScroller extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    if (contacts == null || contacts!.isEmpty) {
-      return const SizedBox.shrink();
-    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min, // Ensures the Column doesn't take extra space
       children: [
         Text(
           title,
-          style: theme.textTheme.titleLarge
-              ?.copyWith(fontWeight: FontWeight.bold, fontSize: 18), // Reduced font size
+          style: theme.textTheme.titleMedium // Reduced from titleLarge
+              ?.copyWith(fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 8.0), // Reduced spacing
-        // 🔴 MODIFIED: Reduced height for a more compact scroller
-        SizedBox(
-          height: 140.0, // Reduced from 150.0
+        const SizedBox(height: 8.0),
+        (contacts == null || contacts!.isEmpty)
+            ? Container(
+          padding: const EdgeInsets.symmetric(vertical: 24.0),
+          alignment: Alignment.center,
+          child: Text(
+            'No professionals registered in this area yet.',
+            style: TextStyle(
+              fontStyle: FontStyle.italic,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        )
+        // 🔴 MODIFIED: Drastically reduced the height of the scroller
+            : SizedBox(
+          height: 95.0, // Reduced from 120.0
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: contacts!.length,
@@ -61,62 +71,63 @@ class ContactScroller extends StatelessWidget {
     final name = contact['name'] ??
         '${contact['first_name'] ?? ''} ${contact['last_name'] ?? ''}'.trim();
     final location =
-        '${contact['town'] ?? 'Unknown Town'}, ${contact['county'] ?? 'Unknown County'}';
+        '${contact['town'] ?? 'Unknown'}, ${contact['county'] ?? 'County'}';
     final phoneNumber = contact['contact'] as String?;
 
-    // 🔴 MODIFIED: Reduced width for a more compact card
+    // 🔴 MODIFIED: Made the card and all its contents much smaller
     return SizedBox(
-      width: 165.0, // Reduced from 180.0
+      width: 140.0, // Reduced from 160.0
       child: Card(
-        margin: const EdgeInsets.only(right: 12.0),
-        elevation: 2.0, // Reduced elevation
+        margin: const EdgeInsets.only(right: 10.0),
+        elevation: 1.0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12.0),
+          borderRadius: BorderRadius.circular(8.0),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(8.0), // Reduced padding
+          padding: const EdgeInsets.all(6.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceAround, // Adjusted spacing
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              // Top section with icon and name
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   CircleAvatar(
-                    radius: 16, // Reduced radius
+                    radius: 12, // Reduced
                     backgroundColor: theme.primaryColor.withOpacity(0.1),
-                    child: Icon(icon, color: theme.primaryColor, size: 18), // Reduced size
+                    child: Icon(icon, color: theme.primaryColor, size: 14), // Reduced
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       name,
-                      style: theme.textTheme.titleMedium
-                          ?.copyWith(fontWeight: FontWeight.bold, fontSize: 14), // Reduced size
-                      maxLines: 2,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 12), // Reduced
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
               ),
+              // Location text
               Text(
                 location,
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: Colors.grey.shade700, fontSize: 12), // Reduced size
-                maxLines: 1,
+                style: TextStyle(color: Colors.grey.shade700, fontSize: 10), // Reduced
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
+              // Call button
               SizedBox(
                 width: double.infinity,
-                height: 30, // Added fixed height
+                height: 24, // Reduced
                 child: FilledButton.tonalIcon(
                   onPressed: () => _dial(phoneNumber),
-                  icon: const Icon(Icons.phone, size: 14), // Reduced size
+                  icon: const Icon(Icons.phone, size: 12), // Reduced
                   label: const Text('Call'),
                   style: FilledButton.styleFrom(
                     textStyle: const TextStyle(
+                      fontSize: 10, // Reduced
                       fontWeight: FontWeight.bold,
-                      fontSize: 12, // Reduced size
                     ),
                   ),
                 ),

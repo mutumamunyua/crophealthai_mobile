@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../config.dart';
+// 🔴 ADDED: Import the international phone field package
+import 'package:intl_phone_field/intl_phone_field.dart';
 
 class ProfessionalRegistrationScreen extends StatefulWidget {
   const ProfessionalRegistrationScreen({super.key});
@@ -63,7 +65,11 @@ class _AgrovetForm extends StatefulWidget {
 class _AgrovetFormState extends State<_AgrovetForm> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _contactController = TextEditingController();
+  // 🔴 REMOVED: The old contact controller
+  // final _contactController = TextEditingController();
+
+  // 🔴 ADDED: A state variable to hold the complete phone number
+  String? _fullPhoneNumber;
 
   List<String> _counties = [];
   List<String> _towns = [];
@@ -83,7 +89,6 @@ class _AgrovetFormState extends State<_AgrovetForm> {
   @override
   void dispose() {
     _nameController.dispose();
-    _contactController.dispose();
     super.dispose();
   }
 
@@ -135,6 +140,8 @@ class _AgrovetFormState extends State<_AgrovetForm> {
   }
 
   Future<void> _submitForm() async {
+    // Reset error and validate
+    _formKey.currentState!.save();
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -146,9 +153,10 @@ class _AgrovetFormState extends State<_AgrovetForm> {
       final response = await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},
+        // 🔴 MODIFIED: Use the full phone number from the state variable
         body: json.encode({
-          'name': _nameController.text,
-          'contact': _contactController.text,
+          'name': _nameController.text.trim(),
+          'contact': _fullPhoneNumber,
           'county': _selectedCounty,
           'town': _selectedTown,
         }),
@@ -161,6 +169,8 @@ class _AgrovetFormState extends State<_AgrovetForm> {
           _selectedCounty = null;
           _selectedTown = null;
           _towns = [];
+          _fullPhoneNumber = null;
+          _nameController.clear();
         });
       } else if (mounted) {
         final errorData = json.decode(response.body);
@@ -204,7 +214,7 @@ class _AgrovetFormState extends State<_AgrovetForm> {
               controller: _nameController,
               decoration: const InputDecoration(labelText: 'Agrovet Name'),
               validator: (value) =>
-              value!.isEmpty ? 'Please enter a name' : null,
+              value!.trim().isEmpty ? 'Please enter a name' : null,
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
@@ -248,12 +258,21 @@ class _AgrovetFormState extends State<_AgrovetForm> {
               value == null ? 'Please select a town' : null,
             ),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _contactController,
+            // 🔴 MODIFIED: Replaced TextFormField with IntlPhoneField
+            IntlPhoneField(
               decoration: const InputDecoration(labelText: 'Phone Contact'),
-              keyboardType: TextInputType.phone,
-              validator: (value) =>
-              value!.isEmpty ? 'Please enter a contact' : null,
+              initialCountryCode: 'KE', // Set default to Kenya
+              onSaved: (phone) {
+                if (phone != null) {
+                  _fullPhoneNumber = phone.completeNumber;
+                }
+              },
+              validator: (phone) {
+                if (phone == null || phone.number.isEmpty) {
+                  return 'Please enter a phone number';
+                }
+                return null;
+              },
             ),
             const SizedBox(height: 32),
             ElevatedButton(
@@ -286,7 +305,9 @@ class _ExtensionWorkerFormState extends State<_ExtensionWorkerForm> {
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _servicesController = TextEditingController();
-  final _contactController = TextEditingController();
+
+  // 🔴 ADDED: A state variable to hold the complete phone number
+  String? _fullPhoneNumber;
 
   List<String> _counties = [];
   List<String> _towns = [];
@@ -308,11 +329,11 @@ class _ExtensionWorkerFormState extends State<_ExtensionWorkerForm> {
     _firstNameController.dispose();
     _lastNameController.dispose();
     _servicesController.dispose();
-    _contactController.dispose();
     super.dispose();
   }
 
   Future<void> _fetchCounties() async {
+    // ... (this method remains the same)
     try {
       final uri = Uri.parse('$backendBaseURL/geolocation/counties');
       final response = await http.get(uri);
@@ -334,6 +355,7 @@ class _ExtensionWorkerFormState extends State<_ExtensionWorkerForm> {
   }
 
   Future<void> _fetchTowns(String county) async {
+    // ... (this method remains the same)
     setState(() {
       _isLoadingTowns = true;
       _towns = [];
@@ -360,6 +382,7 @@ class _ExtensionWorkerFormState extends State<_ExtensionWorkerForm> {
   }
 
   Future<void> _submitForm() async {
+    _formKey.currentState!.save();
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -371,10 +394,11 @@ class _ExtensionWorkerFormState extends State<_ExtensionWorkerForm> {
       final response = await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},
+        // 🔴 MODIFIED: Use the full phone number from the state variable
         body: json.encode({
-          'first_name': _firstNameController.text,
-          'last_name': _lastNameController.text,
-          'contact': _contactController.text,
+          'first_name': _firstNameController.text.trim(),
+          'last_name': _lastNameController.text.trim(),
+          'contact': _fullPhoneNumber,
           'services':
           _servicesController.text.split(',').map((s) => s.trim()).toList(),
           'county': _selectedCounty,
@@ -389,6 +413,10 @@ class _ExtensionWorkerFormState extends State<_ExtensionWorkerForm> {
           _selectedCounty = null;
           _selectedTown = null;
           _towns = [];
+          _fullPhoneNumber = null;
+          _firstNameController.clear();
+          _lastNameController.clear();
+          _servicesController.clear();
         });
       } else if (mounted) {
         final errorData = json.decode(response.body);
@@ -432,14 +460,14 @@ class _ExtensionWorkerFormState extends State<_ExtensionWorkerForm> {
               controller: _firstNameController,
               decoration: const InputDecoration(labelText: 'First Name'),
               validator: (value) =>
-              value!.isEmpty ? 'Please enter a first name' : null,
+              value!.trim().isEmpty ? 'Please enter a first name' : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _lastNameController,
               decoration: const InputDecoration(labelText: 'Last Name'),
               validator: (value) =>
-              value!.isEmpty ? 'Please enter a last name' : null,
+              value!.trim().isEmpty ? 'Please enter a last name' : null,
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
@@ -489,15 +517,24 @@ class _ExtensionWorkerFormState extends State<_ExtensionWorkerForm> {
                   labelText: 'Services',
                   hintText: 'e.g. soil testing, pest control'),
               validator: (value) =>
-              value!.isEmpty ? 'Please enter services' : null,
+              value!.trim().isEmpty ? 'Please enter services' : null,
             ),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _contactController,
+            // 🔴 MODIFIED: Replaced TextFormField with IntlPhoneField
+            IntlPhoneField(
               decoration: const InputDecoration(labelText: 'Phone Contact'),
-              keyboardType: TextInputType.phone,
-              validator: (value) =>
-              value!.isEmpty ? 'Please enter a contact' : null,
+              initialCountryCode: 'KE', // Set default to Kenya
+              onSaved: (phone) {
+                if (phone != null) {
+                  _fullPhoneNumber = phone.completeNumber;
+                }
+              },
+              validator: (phone) {
+                if (phone == null || phone.number.isEmpty) {
+                  return 'Please enter a phone number';
+                }
+                return null;
+              },
             ),
             const SizedBox(height: 32),
             ElevatedButton(

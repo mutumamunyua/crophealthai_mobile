@@ -15,13 +15,13 @@ import 'phone_registration_screen.dart';
 import '../widgets/news_banner.dart';
 import '../config.dart';
 import 'professional_registration_screen.dart';
-// 🔴 ADDED: Import for the LandingScreen to navigate to on logout
 import 'landing_screen.dart';
 
-const double kDefaultPadding = 24.0;
-const double kSmallSpacing = 12.0;
-const double kMediumSpacing = 24.0;
-const double kImageDisplayHeight = 180.0;
+const double kDefaultPadding = 16.0; // Reduced
+const double kSmallSpacing = 8.0;   // Reduced
+const double kMediumSpacing = 16.0;
+// 🔴 MODIFIED: Reduced image height for a more compact UI
+const double kImageDisplayHeight = 150.0; // Reduced from 180.0
 
 class DiagnoseScreen extends StatefulWidget {
   const DiagnoseScreen({Key? key}) : super(key: key);
@@ -75,14 +75,13 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
         desiredAccuracy: LocationAccuracy.high);
   }
 
-  // 🔴 MODIFIED: Changed navigation to go back to LandingScreen
   Future<void> _logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('token');
     if (context.mounted) {
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (context) => const LandingScreen()), // Changed from PhoneRegistrationScreen
+        MaterialPageRoute(builder: (context) => const LandingScreen()),
             (Route<dynamic> route) => false,
       );
     }
@@ -231,23 +230,32 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Crop Diagnosis'),
-        actions: [
-          IconButton(icon: const Icon(Icons.logout), onPressed: _logout)
-        ],
-      ),
-      body: Column(
-        children: [
-          if (_imageBytes == null) _buildPickerControls(),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(kDefaultPadding),
-              child: _buildContentArea(),
+    return WillPopScope(
+      onWillPop: () async {
+        if (_imageBytes != null) {
+          _resetState();
+          return false;
+        }
+        return true;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Crop Diagnosis'),
+          actions: [
+            IconButton(icon: const Icon(Icons.logout), onPressed: _logout)
+          ],
+        ),
+        body: Column(
+          children: [
+            if (_imageBytes == null) _buildPickerControls(),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(kDefaultPadding),
+                child: _buildContentArea(),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -315,6 +323,8 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
               style: theme.textTheme.titleMedium, textAlign: TextAlign.center),
           const SizedBox(height: kMediumSpacing),
           _buildTitledNewsBanner(),
+          const SizedBox(height: kMediumSpacing),
+          _buildRegistrationButtons(),
         ],
         if (!_isLoading && _fallbackWorkers != null) _buildFallbackUI(),
         if (!_isLoading && _diagnosis != null) _buildSuccessUI(),
@@ -326,8 +336,21 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
     );
   }
 
+  // 🔴 MODIFIED: This entire method is updated for a more compact layout
   Widget _buildSuccessUI() {
     final theme = Theme.of(context);
+    // Convert confidence string to a double for logic
+    final confidenceValue = double.tryParse(_confidence ?? '0.0') ?? 0.0;
+
+    // Helper function to determine color based on confidence
+    Color getConfidenceColor(double value) {
+      if (value > 75) return Colors.green.shade700;
+      if (value > 40) return Colors.amber.shade800;
+      return Colors.red.shade700;
+    }
+
+    final confidenceColor = getConfidenceColor(confidenceValue);
+
     return Column(
       children: [
         ClipRRect(
@@ -346,37 +369,102 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text('Diagnosis Result',
-                    style: theme.textTheme.headlineSmall?.copyWith(
+                    style: theme.textTheme.titleLarge?.copyWith(
                         fontFamily: 'Garamond', fontWeight: FontWeight.bold)),
-                const Divider(),
-                Text('Disease: $_diagnosis', style: theme.textTheme.titleMedium),
-                Text('Confidence: $_confidence%',
-                    style: theme.textTheme.titleMedium),
-                const SizedBox(height: kSmallSpacing),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => TreatmentScreen(
-                          disease: _diagnosis!,
-                          treatmentData: _treatmentData,
-                          imageUrls: _treatmentImages,
-                          agrovets: _agrovets,
-                          extensionWorkers: _extensionWorkers,
+                const Divider(height: 12),
+
+                // 🔴 MODIFIED: Restructured 'Disease' display for specific colors
+                Row(
+                  children: [
+                    Text(
+                      'Disease: ',
+                      style: theme.textTheme.titleMedium, // Default black color
+                    ),
+                    Text(
+                      _diagnosis ?? 'Unknown',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: Colors.red.shade700, // The "shouting" red color
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // 🔴 MODIFIED: Restructured 'Confidence' display with a progress bar
+                Row(
+                  children: [
+                    Text(
+                      'Confidence: ',
+                      style: theme.textTheme.titleMedium, // Default black color
+                    ),
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: LinearProgressIndicator(
+                          value: confidenceValue / 100.0, // Value is 0.0 to 1.0
+                          minHeight: 12,
+                          backgroundColor: Colors.grey.shade300,
+                          valueColor: AlwaysStoppedAnimation<Color>(confidenceColor),
                         ),
                       ),
-                    );
-                  },
-                  child: const Text('View Full Treatment'),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '$_confidence%',
+                      style: theme.textTheme.bodySmall?.copyWith( // Smaller font size
+                        color: confidenceColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: kMediumSpacing),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _resetState,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal.shade400,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('New Diagnosis'),
+                      ),
+                    ),
+                    const SizedBox(width: kSmallSpacing),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => TreatmentScreen(
+                                disease: _diagnosis!,
+                                treatmentData: _treatmentData,
+                                imageUrls: _treatmentImages,
+                                agrovets: _agrovets,
+                                extensionWorkers: _extensionWorkers,
+                              ),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).primaryColor,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('View Treatment'),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
         ),
-        const SizedBox(height: kMediumSpacing),
+        const SizedBox(height: kSmallSpacing),
         _buildTitledNewsBanner(),
-        const SizedBox(height: kMediumSpacing),
+        const SizedBox(height: kSmallSpacing),
         _buildRegistrationButtons(),
       ],
     );
@@ -393,7 +481,7 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
             Text(
               "FARMING NEWS & ALERTS",
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 16, // Reduced font size
                 fontWeight: FontWeight.bold,
                 fontFamily: 'Garamond',
                 color: Colors.indigo.shade900,
@@ -409,7 +497,7 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
   Widget _buildRegistrationButtons() {
     return Column(
       children: [
-        const Divider(height: 32),
+        const Divider(height: 24), // Reduced spacing
         Text(
           "Are you a professional? Help farmers find you:",
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(

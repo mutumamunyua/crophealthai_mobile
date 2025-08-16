@@ -1,21 +1,19 @@
-// FILE: lib/main.dart
-// FIX: This file is now corrected to ALWAYS start the app on your LandingScreen, as you originally designed.
+// lib/main.dart
 
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+// 🔴 ADDED: Import for persistent storage
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'firebase_options.dart';
-import 'screens/landing_screen.dart'; // <-- IMPORT YOUR LANDING SCREEN
-import 'screens/phone_registration_screen.dart';
+import 'screens/landing_screen.dart';
 import 'screens/diagnose_screen.dart';
 
 Future<void> main() async {
-  // These two lines are still necessary for Firebase to work correctly.
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-
   runApp(const MyApp());
 }
 
@@ -30,15 +28,65 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.green,
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      // ✅ FIX: The app will ALWAYS start on your LandingScreen now.
-      initialRoute: '/landing',
-      routes: {
-        // Define all the possible routes for your app
-        '/landing': (_) => const LandingScreen(),
-        '/login_phone': (_) => const PhoneRegistrationScreen(),
-        '/diagnose': (_) => const DiagnoseScreen(),
-        // You can add your email login route here later
-      },
+      // 🔴 MODIFIED: The app now starts with our new AuthCheckScreen
+      home: const AuthCheckScreen(),
+    );
+  }
+}
+
+// 🔴 ADDED: A new screen to check the user's login status on startup
+class AuthCheckScreen extends StatefulWidget {
+  const AuthCheckScreen({super.key});
+
+  @override
+  State<AuthCheckScreen> createState() => _AuthCheckScreenState();
+}
+
+class _AuthCheckScreenState extends State<AuthCheckScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _checkLoginStatus();
+  }
+
+  Future<void> _checkLoginStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    final expiryString = prefs.getString('tokenExpiry');
+
+    // If there is no token or no expiry date, go to the landing screen
+    if (token == null || expiryString == null) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LandingScreen()),
+      );
+      return;
+    }
+
+    final expiryDate = DateTime.parse(expiryString);
+
+    // If the token is expired, go to the landing screen
+    if (DateTime.now().isAfter(expiryDate)) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LandingScreen()),
+      );
+    } else {
+      // If the token is valid and not expired, go directly to the diagnose screen
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const DiagnoseScreen()),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Show a loading spinner while we check the login status
+    return const Scaffold(
+      body: Center(
+        child: CircularProgressIndicator(),
+      ),
     );
   }
 }
