@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../config.dart';
-// 🔴 ADDED: Import the international phone field package
 import 'package:intl_phone_field/intl_phone_field.dart';
 
 class ProfessionalRegistrationScreen extends StatefulWidget {
@@ -53,7 +52,7 @@ class _ProfessionalRegistrationScreenState
 }
 
 // -----------------------------------------------------------------------------
-// AGROVET REGISTRATION FORM
+// AGROVET REGISTRATION FORM (Unchanged)
 // -----------------------------------------------------------------------------
 class _AgrovetForm extends StatefulWidget {
   const _AgrovetForm();
@@ -65,17 +64,11 @@ class _AgrovetForm extends StatefulWidget {
 class _AgrovetFormState extends State<_AgrovetForm> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  // 🔴 REMOVED: The old contact controller
-  // final _contactController = TextEditingController();
-
-  // 🔴 ADDED: A state variable to hold the complete phone number
   String? _fullPhoneNumber;
-
   List<String> _counties = [];
   List<String> _towns = [];
   String? _selectedCounty;
   String? _selectedTown;
-
   bool _isLoadingCounties = true;
   bool _isLoadingTowns = false;
   bool _isSubmitting = false;
@@ -140,20 +133,16 @@ class _AgrovetFormState extends State<_AgrovetForm> {
   }
 
   Future<void> _submitForm() async {
-    // Reset error and validate
     _formKey.currentState!.save();
     if (!_formKey.currentState!.validate()) {
       return;
     }
-
     setState(() => _isSubmitting = true);
-
     try {
       final uri = Uri.parse('$backendBaseURL/register/agrovet');
       final response = await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},
-        // 🔴 MODIFIED: Use the full phone number from the state variable
         body: json.encode({
           'name': _nameController.text.trim(),
           'contact': _fullPhoneNumber,
@@ -161,7 +150,6 @@ class _AgrovetFormState extends State<_AgrovetForm> {
           'town': _selectedTown,
         }),
       );
-
       if (mounted && response.statusCode == 201) {
         _showSuccessSnackBar('Agrovet registered successfully!');
         _formKey.currentState!.reset();
@@ -258,10 +246,9 @@ class _AgrovetFormState extends State<_AgrovetForm> {
               value == null ? 'Please select a town' : null,
             ),
             const SizedBox(height: 16),
-            // 🔴 MODIFIED: Replaced TextFormField with IntlPhoneField
             IntlPhoneField(
               decoration: const InputDecoration(labelText: 'Phone Contact'),
-              initialCountryCode: 'KE', // Set default to Kenya
+              initialCountryCode: 'KE',
               onSaved: (phone) {
                 if (phone != null) {
                   _fullPhoneNumber = phone.completeNumber;
@@ -304,16 +291,25 @@ class _ExtensionWorkerFormState extends State<_ExtensionWorkerForm> {
   final _formKey = GlobalKey<FormState>();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
-  final _servicesController = TextEditingController();
-
-  // 🔴 ADDED: A state variable to hold the complete phone number
   String? _fullPhoneNumber;
+
+  // 🔴 MODIFIED: State for multi-select services
+  final List<String> _allServices = [
+    'Horticulture',
+    'Cash Crop Management',
+    'Veterinary Services',
+    'Soil Analysis',
+    'Irrigation Advice',
+    'Pest & Disease Control',
+    'Crop Rotation Planning',
+    'Agribusiness Advice'
+  ];
+  final List<String> _selectedServices = [];
 
   List<String> _counties = [];
   List<String> _towns = [];
   String? _selectedCounty;
   String? _selectedTown;
-
   bool _isLoadingCounties = true;
   bool _isLoadingTowns = false;
   bool _isSubmitting = false;
@@ -328,8 +324,60 @@ class _ExtensionWorkerFormState extends State<_ExtensionWorkerForm> {
   void dispose() {
     _firstNameController.dispose();
     _lastNameController.dispose();
-    _servicesController.dispose();
     super.dispose();
+  }
+
+  // 🔴 ADDED: A method to show the multi-select dialog
+  void _showMultiSelectDialog() async {
+    final List<String> tempSelectedServices = List.from(_selectedServices);
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Select Services'),
+          content: StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+              return SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: _allServices.map((service) {
+                    return CheckboxListTile(
+                      title: Text(service),
+                      value: tempSelectedServices.contains(service),
+                      onChanged: (isSelected) {
+                        setState(() {
+                          if (isSelected ?? false) {
+                            tempSelectedServices.add(service);
+                          } else {
+                            tempSelectedServices.remove(service);
+                          }
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              child: const Text('CANCEL'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            ElevatedButton(
+              child: const Text('DONE'),
+              onPressed: () {
+                setState(() {
+                  _selectedServices.clear();
+                  _selectedServices.addAll(tempSelectedServices);
+                });
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _fetchCounties() async {
@@ -383,7 +431,11 @@ class _ExtensionWorkerFormState extends State<_ExtensionWorkerForm> {
 
   Future<void> _submitForm() async {
     _formKey.currentState!.save();
-    if (!_formKey.currentState!.validate()) {
+    // 🔴 MODIFIED: Added validation for selected services
+    if (!_formKey.currentState!.validate() || _selectedServices.isEmpty) {
+      if (_selectedServices.isEmpty) {
+        _showErrorSnackBar('Please select at least one service.');
+      }
       return;
     }
 
@@ -394,13 +446,12 @@ class _ExtensionWorkerFormState extends State<_ExtensionWorkerForm> {
       final response = await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},
-        // 🔴 MODIFIED: Use the full phone number from the state variable
+        // 🔴 MODIFIED: Use the _selectedServices list
         body: json.encode({
           'first_name': _firstNameController.text.trim(),
           'last_name': _lastNameController.text.trim(),
           'contact': _fullPhoneNumber,
-          'services':
-          _servicesController.text.split(',').map((s) => s.trim()).toList(),
+          'services': _selectedServices,
           'county': _selectedCounty,
           'town': _selectedTown,
         }),
@@ -416,7 +467,7 @@ class _ExtensionWorkerFormState extends State<_ExtensionWorkerForm> {
           _fullPhoneNumber = null;
           _firstNameController.clear();
           _lastNameController.clear();
-          _servicesController.clear();
+          _selectedServices.clear();
         });
       } else if (mounted) {
         final errorData = json.decode(response.body);
@@ -511,19 +562,44 @@ class _ExtensionWorkerFormState extends State<_ExtensionWorkerForm> {
               value == null ? 'Please select a town' : null,
             ),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _servicesController,
-              decoration: const InputDecoration(
-                  labelText: 'Services',
-                  hintText: 'e.g. soil testing, pest control'),
-              validator: (value) =>
-              value!.trim().isEmpty ? 'Please enter services' : null,
+            // 🔴 MODIFIED: Replaced the services text field with this new UI
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Services Offered', style: TextStyle(fontSize: 16)),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade400),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Wrap(
+                    spacing: 8.0,
+                    runSpacing: 4.0,
+                    children: [
+                      ..._selectedServices.map((service) => Chip(
+                        label: Text(service),
+                        onDeleted: () {
+                          setState(() {
+                            _selectedServices.remove(service);
+                          });
+                        },
+                      )),
+                      ActionChip(
+                        avatar: const Icon(Icons.add),
+                        label: const Text('Select Services'),
+                        onPressed: _showMultiSelectDialog,
+                      )
+                    ],
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
-            // 🔴 MODIFIED: Replaced TextFormField with IntlPhoneField
             IntlPhoneField(
               decoration: const InputDecoration(labelText: 'Phone Contact'),
-              initialCountryCode: 'KE', // Set default to Kenya
+              initialCountryCode: 'KE',
               onSaved: (phone) {
                 if (phone != null) {
                   _fullPhoneNumber = phone.completeNumber;
